@@ -14,7 +14,8 @@
 [Quick Start](#-quick-start) •
 [Examples](#-usage-examples) •
 [Project Structure](#-project-structure) •
-[Documentation](#-documentation)
+[Documentation](#-documentation) •
+[Roadmap](#-roadmap)
 
 </div>
 
@@ -238,3 +239,7 @@ zig test quickstart.zig
 
 - [API Referance](API_referance.md) - Complete API documentation
 - [quickstart](quickstart.zig) - Runnable code examples
+
+## 📖 Roadmap
+
+The team has proposed an initial [community roadmap](/ROADMAP.md) and wider community inputs are welcomed.
