@@ -1,6 +1,6 @@
 <div align="center">
 
-# RLM-Zig
+# Omni-RLM
 
 ### A High-Performance Recursive Language Model Framework
 
@@ -20,9 +20,9 @@
 
 ## 📖 Overview
 
-RLM-Zig is a **high-performance recursive language model framework** that enables AI agents to perform complex reasoning tasks through controlled recursive LLM calls. Built with Zig's zero-cost abstractions and memory safety features, it provides a robust foundation for production-grade AI applications.
+Omni-RLM is a **high-performance [recursive language model framework](https://github.com/alexzhang13/rlm)** that enables AI agents to perform complex reasoning tasks through controlled recursive LLM calls. Built with Zig's zero-cost abstractions and memory safety features, it provides a robust foundation for production-grade AI applications.
 
-### Why RLM-Zig?
+### Why Omni-RLM?
 
 - 🚀 **Blazing Fast**: Leveraging Zig's zero-cost abstractions and manual memory management for optimal performance
 - 🔄 **Recursive Reasoning**: Support for multi-depth language model calls with fine-grained control
@@ -38,7 +38,7 @@ RLM-Zig is a **high-performance recursive language model framework** that enable
 | **Recursive Execution** | Execute language models with configurable recursion depth limits |
 | **Query Tracking** | Automatic tracking of context length, type, and metadata |
 | **Iteration Logging** | JSON-formatted logs for every iteration with full traceability |
-| **Backend Flexibility** | Easy integration with OpenAI, Qwen, or any compatible API |
+| **Backend Flexibility** | Easy integration with OpenAI, Qwen, or any compatible LLM-API spec |
 | **Memory Safety** | Built-in protection against memory leaks and undefined behavior |
 | **Custom Prompts** | Override system prompts for specialized agent behaviors |
 
