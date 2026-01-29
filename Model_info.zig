@@ -45,7 +45,7 @@ pub const ModelHandler = struct {
 test "ModelHandler_make_request" {
     const allocator = std.testing.allocator;
 
-    var model_handler = ModelHandler{ .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", .api_key = "sk-a0f4532f91414ad2b8775bbbf07b31e4", .model_name = "qwen-plus" };
+    var model_handler = ModelHandler{ .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", .api_key = "", .model_name = "qwen-plus" };
     const to_be_post_messages = try allocator.alloc(Message, 1);
     defer allocator.free(to_be_post_messages);
     to_be_post_messages[0] = Message{
