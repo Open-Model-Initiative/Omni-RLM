@@ -13,6 +13,8 @@
 [Installation](#installation) •
 [Quick Start](#-quick-start) •
 [Examples](#-usage-examples) •
+[Project Structure](#-project-structure) •
+[Documentation](#-documentation)
 
 </div>
 
@@ -69,9 +71,9 @@ pub fn main() !void {
         .backend = "openai",
         .backend_kwargs = 
         \\{
-        \\"base_url":"https://api.openai.com/v1/chat/completions",
+        \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
         \\"api_key":"your-api-key-here",
-        \\"model_name":"gpt-4"
+        \\"model_name":"qwen-plus"
         \\}
         ,
         .environment = "local",
@@ -212,3 +214,27 @@ rlm-zig/
 - **`parsing.zig`**: Utilities to extract structured data from responses
 - **`quickstart.zig`**: Runnable example demonstrating basic usage
 - **`Model_info.zig`**: Model configurations and capabilities
+
+## 🧪 test
+
+run test：
+
+```bash
+zig test rlm.zig
+zig test rlm_logger.zig
+zig test prompt.zig
+zig test parsing.zig
+zig test Model_info.zig
+zig test types.zig
+```
+
+run quickstart example：
+
+```bash
+zig test quickstart.zig
+```
+
+## 📖 Documentation
+
+- [API Referance](API_referance.md) - Complete API documentation
+- [quickstart](quickstart.zig) - Runnable code examples
