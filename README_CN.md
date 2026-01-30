@@ -66,6 +66,8 @@ pip install dill
 
 以下是一个简单的入门示例：
 
+**注意：请更换api_key为你自己的API密钥。**
+
 ```zig
 const std = @import("std");
 const RLM = @import("rlm.zig").RLM;
@@ -92,6 +94,7 @@ pub fn main() !void {
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
+        .max_iterations = 10,
     };
 
     try rlm.init();

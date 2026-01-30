@@ -56,6 +56,8 @@ Omni-RLM is a **high-performance [recursive language model framework](https://gi
 
 Here's a simple example to get you started:
 
+IMPORTANT: Replace `"your-api-key-here"` with your actual API key.
+
 ```zig
 const std = @import("std");
 const RLM = @import("rlm.zig").RLM;
@@ -82,6 +84,7 @@ pub fn main() !void {
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
+        .max_iterations = 10,
     };
 
     try rlm.init();
