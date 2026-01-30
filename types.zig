@@ -112,7 +112,7 @@ pub const RLMIteration = struct {
 
 test "RLMIteration find_final_answer" {
     std.fs.cwd().access("env.dill", .{}) catch {
-        std.debug.print("\n\"env.dill\" not found, skipping test\n", .{});
+        std.debug.print("\n\"env.dill\" not found, skipping RLMIteration find_final_answer test\n", .{});
         return error.SkipZigTest;
     };
     const allocator = std.testing.allocator;
