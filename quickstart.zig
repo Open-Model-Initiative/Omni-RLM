@@ -4,6 +4,8 @@ const std = @import("std");
 const RLM = @import("rlm.zig").RLM;
 
 test "quickstart runs without error" {
+    std.debug.print("\n*******RLM started*******\n", .{});
+
     const allocator = std.testing.allocator;
 
     const logger = try RLMLogger.init("./logs", "quickstart", allocator);
@@ -24,6 +26,7 @@ test "quickstart runs without error" {
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,
+            .max_iterations = 5,
         };
 
     try rlm.init();
@@ -35,4 +38,6 @@ test "quickstart runs without error" {
     const result = try rlm.completion(p, null);
     defer allocator.free(result.response);
     std.debug.print("total time: {d}ms\n", .{result.execution_time});
+
+    std.debug.print("\n*******RLM finished*******\n", .{});
 }

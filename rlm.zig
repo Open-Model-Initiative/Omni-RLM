@@ -137,6 +137,10 @@ pub const RLM = struct {
 
         //Setup environment handler
         const env: EnvHandler = .{ .mainfunc = "python_script/env_init.py", .context = prompt };
+        defer {
+            // Clean up environment if needed
+            std.fs.cwd().deleteFile("env.dill") catch {};
+        }
 
         //Setup model handler
         const processed_backend_kwargs: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, self.backend_kwargs, .{});

@@ -123,19 +123,19 @@ test "buildUserPrompt works" {
         const prompt_no_root = try buildUserPrompt(null, 0, allocator);
         defer ReleaseMessageArray(prompt_no_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_no_root }, .{});
-        std.debug.print("Prompt without root:\n{f}\n", .{formatter});
+        std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 0)\n{f}\n", .{formatter});
     }
     {
         const prompt_with_root = try buildUserPrompt("What is the capital of France?", 0, allocator);
         defer ReleaseMessageArray(prompt_with_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
-        std.debug.print("Prompt with root:\n{f}\n", .{formatter});
+        std.debug.print("\nTESTING:\nUser Prompt with root:\n{f}\n", .{formatter});
     }
     {
         const prompt_without_root = try buildUserPrompt(null, 1, allocator);
         defer ReleaseMessageArray(prompt_without_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_without_root }, .{});
-        std.debug.print("Prompt without root:\n{f}\n", .{formatter});
+        std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 1)\n{f}\n", .{formatter});
     }
 }
 
@@ -166,7 +166,7 @@ test "buildSystemPrompt works" {
     const formatter = std.json.fmt(.{ .message = system_prompt }, .{});
     // const out = try std.fmt.allocPrint(allocator, "{f}", .{formatter});
 
-    std.debug.print("{f}", .{formatter});
+    std.debug.print("\nTESTING:System Prompt\n{f}\n", .{formatter});
 }
 
 pub fn ReleaseMessageArray(messages: []Message, allocator: std.mem.Allocator) void {

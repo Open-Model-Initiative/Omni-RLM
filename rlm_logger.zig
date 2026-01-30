@@ -93,7 +93,7 @@ pub const RLMLogger = struct {
 
 test "RLMLogger initialization" {
     const allocator = std.testing.allocator;
-    var logger = try RLMLogger.init("./logs", "rlm", allocator);
+    var logger = try RLMLogger.init("./logs", "Test initialization", allocator);
     defer logger.deinit(allocator);
 
     try std.testing.expectEqualStrings(logger.log_dir, "./logs");
@@ -104,7 +104,7 @@ test "RLMLogger initialization" {
 test "RLMLogger log_iteration" {
     const Message = @import("types.zig").Message;
     const allocator = std.testing.allocator;
-    var logger = try RLMLogger.init("./logs", "rlmiteration", allocator);
+    var logger = try RLMLogger.init("./logs", "Test rlmiteration", allocator);
     defer logger.deinit(allocator);
 
     const iteration_data: RLMIteration = .{
@@ -123,7 +123,7 @@ test "RLMLogger log_iteration" {
 
 test "RLMLogger log_metadata" {
     const allocator = std.testing.allocator;
-    var logger = try RLMLogger.init("./logs", "rlmmetadata", allocator);
+    var logger = try RLMLogger.init("./logs", "Test rlmmetadata", allocator);
     defer logger.deinit(allocator);
     const metadata: Metadata = .{
         .root_model = "TestModel",

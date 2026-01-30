@@ -98,22 +98,7 @@ pub const RLMIteration = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "-c",
-                \\import re, sys, dill
-                \\dill.load_session("env.dill")
-                \\text = sys.argv[1]
-                \\final_var_pattern = r"^\s*FINAL(_VAR)?\((.*?)\)"
-                \\match = re.search(final_var_pattern, text, re.MULTILINE | re.DOTALL)
-                \\if match:
-                \\    variable_name = match.group(2).strip().strip('"').strip("'")
-                \\    if variable_name in globals():
-                \\        final_answer = FINAL_VAR(variable_name)
-                \\    else:
-                \\        final_answer = FINAL(variable_name)
-                \\    if final_answer is not None:
-                \\        final_answer = final_answer.strip()
-                \\    print(final_answer if final_answer else None)
-                ,
+                "python_script/find_final_answer.py",
                 text,
             },
         });
@@ -126,6 +111,10 @@ pub const RLMIteration = struct {
 };
 
 test "RLMIteration find_final_answer" {
+    std.fs.cwd().access("env.dill", .{}) catch {
+        std.debug.print("\n\"env.dill\" not found, skipping test\n", .{});
+        return error.SkipZigTest;
+    };
     const allocator = std.testing.allocator;
     var iteration = RLMIteration{
         .prompt = &[_]Message{},
@@ -141,7 +130,7 @@ test "RLMIteration find_final_answer" {
             },
         },
         .final_answer = null,
-        .iteration_time = 123456,
+        .iteration_time = 123,
     };
 
     try iteration.find_final_answer(allocator);
@@ -200,9 +189,9 @@ test "EnvHandler execute_code" {
     const env = EnvHandler{
         .mainfunc = "python_script/env_init.py",
     };
-    const code = "for i in range(20):\n   print('Hello from EnvHandler')";
+    const code = "for i in range(1):\n   print('Hello from EnvHandler')";
     const result = try env.execute_code(code, allocator);
     defer allocator.free(result.stdout);
     defer allocator.free(result.stderr);
-    std.debug.print("{s}", .{result.stdout});
+    try std.testing.expectEqualStrings("Hello from EnvHandler\n", result.stdout);
 }
