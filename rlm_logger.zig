@@ -130,9 +130,11 @@ test "RLMLogger log_metadata" {
         .max_depth = 5,
         .max_iterations = 100,
         .backend = "openai",
-        .backend_kwargs =
-        \\{"api_key":"secret"}
-        ,
+        .backend_kwargs = .{
+            .api_key = "sk-scret",
+            .base_url = "www.test.com",
+            .model_name = "qwen",
+        },
         .environment_type = "local",
         .environment_kwargs = "{}",
         .other_backends = null,

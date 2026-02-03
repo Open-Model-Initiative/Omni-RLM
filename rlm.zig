@@ -1,5 +1,6 @@
 const RLMLogger = @import("rlm_logger.zig").RLMLogger;
 const std = @import("std");
+const backendKwargs = @import("types.zig").backendKwargs;
 const PROMPT = @import("prompt.zig");
 const RLMIteration = @import("types.zig").RLMIteration;
 const QueryMetadata = @import("types.zig").QueryMetadata;
@@ -14,7 +15,7 @@ const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 pub const RLM = struct {
     backend: []const u8 = "openai",
     /// Please provide full information of api_key, base_url, model_name in json format
-    backend_kwargs: []const u8 = "{}",
+    backend_kwargs: backendKwargs,
     environment: []const u8 = "local",
     environment_kwargs: []const u8 = "{}",
     depth: u32 = 0,
