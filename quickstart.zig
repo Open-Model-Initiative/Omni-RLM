@@ -7,6 +7,8 @@ test "quickstart runs without error" {
     std.debug.print("\n*******RLM started*******\n", .{});
 
     const allocator = std.testing.allocator;
+    const api_key = try std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY");
+    defer allocator.free(api_key);
 
     const logger = try RLMLogger.init("./logs", "quickstart", allocator);
 
@@ -16,7 +18,7 @@ test "quickstart runs without error" {
             // must provide full information of api_key, base_url, model_name in json format
             .backend_kwargs = .{
                 .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                .api_key = "",
+                .api_key = api_key,
                 .model_name = "qwen-plus",
             },
             .environment = "local",

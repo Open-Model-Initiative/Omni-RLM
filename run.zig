@@ -4,9 +4,14 @@ const std = @import("std");
 const RLM = @import("rlm.zig").RLM;
 
 pub fn main() !void {
-    std.debug.print("\n*******RLM started*******\n", .{});
-
     const allocator = std.heap.page_allocator;
+    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
+        std.debug.print("Environment variable DASHSCOPE_API_KEY is not set.\n", .{});
+        return error.MissingApiKey;
+    };
+    defer allocator.free(api_key);
+
+    std.debug.print("\n*******RLM started*******\n", .{});
 
     const logger = try RLMLogger.init("./logs", "run", allocator);
 
@@ -16,7 +21,8 @@ pub fn main() !void {
             // must provide full information of api_key, base_url, model_name in json format
             .backend_kwargs = .{
                 .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                .api_key = "",
+                // .api_key = "",
+                .api_key = api_key,
                 .model_name = "qwen-plus",
             },
             .environment = "local",
