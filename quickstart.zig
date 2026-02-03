@@ -14,13 +14,11 @@ test "quickstart runs without error" {
         .{
             .backend = "openai",
             // must provide full information of api_key, base_url, model_name in json format
-            .backend_kwargs =
-            \\{
-            \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            \\"api_key":"",
-            \\"model_name":"qwen-plus"
-            \\}
-            ,
+            .backend_kwargs = .{
+                .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+                .api_key = "",
+                .model_name = "qwen-plus",
+            },
             .environment = "local",
             .environment_kwargs = "{}",
             .max_depth = 1,

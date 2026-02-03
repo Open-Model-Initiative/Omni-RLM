@@ -1,5 +1,6 @@
 const RLMLogger = @import("rlm_logger.zig").RLMLogger;
 const std = @import("std");
+const backendKwargs = @import("types.zig").backendKwargs;
 const PROMPT = @import("prompt.zig");
 const RLMIteration = @import("types.zig").RLMIteration;
 const QueryMetadata = @import("types.zig").QueryMetadata;
@@ -14,7 +15,7 @@ const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 pub const RLM = struct {
     backend: []const u8 = "openai",
     /// Please provide full information of api_key, base_url, model_name in json format
-    backend_kwargs: []const u8 = "{}",
+    backend_kwargs: backendKwargs,
     environment: []const u8 = "local",
     environment_kwargs: []const u8 = "{}",
     depth: u32 = 0,
@@ -29,11 +30,8 @@ pub const RLM = struct {
     pub fn init(self: *RLM) !void {
         // Initialization logic if needed
         if (self.logger != null) {
-            const parsed_backend_kwargs = try std.json.parseFromSlice(std.json.Value, self.allocator, self.backend_kwargs, .{});
-            defer parsed_backend_kwargs.deinit();
-
             const metadata: RLMMetadata = .{
-                .root_model = parsed_backend_kwargs.value.object.get("model_name").?.string,
+                .root_model = self.backend_kwargs.model_name,
                 .max_depth = self.max_depth,
                 .max_iterations = self.max_iterations,
                 .backend = self.backend,
@@ -143,12 +141,10 @@ pub const RLM = struct {
         }
 
         //Setup model handler
-        const processed_backend_kwargs: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, self.backend_kwargs, .{});
-        defer processed_backend_kwargs.deinit();
         const lm_handler = ModelHandler{
-            .api_key = processed_backend_kwargs.value.object.get("api_key").?.string,
-            .base_url = processed_backend_kwargs.value.object.get("base_url").?.string,
-            .model_name = processed_backend_kwargs.value.object.get("model_name").?.string,
+            .api_key = self.backend_kwargs.api_key,
+            .base_url = self.backend_kwargs.base_url,
+            .model_name = self.backend_kwargs.model_name,
         };
 
         if (self.depth >= self.max_depth) {

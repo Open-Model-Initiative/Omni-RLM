@@ -6,43 +6,24 @@ const Value = json.Value;
 //finish tostr implementations for each struct
 ////*********************////
 
+pub const backendKwargs = struct {
+    api_key: []const u8,
+    base_url: []const u8,
+    model_name: []const u8,
+    pub fn tostr() void {} //TODO implement tostr
+};
+
 pub const RLMMetadata = struct {
     root_model: []const u8,
     max_depth: u32,
     max_iterations: u32,
     backend: []const u8,
-    backend_kwargs: []const u8,
-    environment_type: []const u8,
-    environment_kwargs: []const u8,
+    backend_kwargs: backendKwargs,
+    environment_type: ?[]const u8 = null,
+    environment_kwargs: ?[]const u8 = null,
     other_backends: ?[]const u8 = null,
     pub fn tostr() void {} //TODO implement tostr
 };
-
-test "RLMMetadata" {
-    const metadata = RLMMetadata{
-        .root_model = "TestModel",
-        .max_depth = 5,
-        .max_iterations = 100,
-        .backend = "openai",
-        .backend_kwargs =
-        \\{"api_key":"secret"}
-        ,
-        .environment_type = "local",
-        .environment_kwargs = "{}",
-        .other_backends = null,
-    };
-
-    const parsed: json.Parsed(Value) = try std.json.parseFromSlice(Value, std.testing.allocator, metadata.backend_kwargs, .{});
-    defer parsed.deinit();
-
-    var obj: std.array_hash_map.StringArrayHashMap(Value) = parsed.value.object;
-    const api_key = obj.get("api_key");
-
-    try std.testing.expectEqualStrings(api_key.?.string, "secret");
-    try std.testing.expectEqualStrings(metadata.root_model, "TestModel");
-    try std.testing.expect(metadata.max_depth == 5);
-    try std.testing.expectEqualStrings(metadata.backend, "openai");
-}
 
 ////TODO add split prompt metadata, now only support str context(multi types e.g. dict, list)
 /// Need to Init and Deinit
