@@ -5,6 +5,9 @@ const file_list = [_][]const u8{
     "rlm_logger.zig",
     "rlm.zig",
     "types.zig",
+    "environment/type.zig",
+    "environment/local.zig",
+    "environment/daytona.zig",
 };
 test {
     const std = @import("std");
@@ -15,6 +18,9 @@ test {
     _ = @import("rlm_logger.zig");
     _ = @import("rlm.zig");
     _ = @import("types.zig");
+    _ = @import("environment/type.zig");
+    _ = @import("environment/local.zig");
+    _ = @import("environment/daytona.zig");
 }
 
 test "env" {

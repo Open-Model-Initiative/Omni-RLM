@@ -9,7 +9,7 @@ const Message = @import("types.zig").Message;
 const CodeBlock = @import("types.zig").CodeBlock;
 const ModelHandler = @import("Model_info.zig").ModelHandler;
 const find_code_blocks = @import("parsing.zig").find_code_blocks;
-const EnvHandler = @import("types.zig").EnvHandler;
+const environment = @import("environment/type.zig");
 const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 
 pub const RLM = struct {
@@ -134,7 +134,14 @@ pub const RLM = struct {
         const timestart = std.time.milliTimestamp();
 
         //Setup environment handler
-        const env: EnvHandler = .{ .mainfunc = "python_script/env_init.py", .context = prompt };
+        //TODO add other environments support
+        var env: environment.EnvHandler = undefined;
+        env = environment.EnvHandler{
+            .local = .{
+                .mainfunc = "python_script/env_init.py",
+                .context = prompt,
+            },
+        };
         defer {
             // Clean up environment if needed
             std.fs.cwd().deleteFile("env.dill") catch {};
@@ -210,7 +217,7 @@ pub const RLM = struct {
         return try self.default_answer(prompt, message_history, lm_handler, allocator);
     }
 
-    fn completion_turn(self: *RLM, prompt: []Message, lm_handler: ModelHandler, env: EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
+    fn completion_turn(self: *RLM, prompt: []Message, lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();
         const response = try lm_handler.make_request(prompt, allocator); //TODO find out what is the difference between @This() and *T

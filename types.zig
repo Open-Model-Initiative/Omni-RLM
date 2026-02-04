@@ -151,28 +151,3 @@ pub const Message = struct {
     role: []const u8 = "user",
     content: []const u8 = "",
 };
-
-pub const EnvHandler = struct {
-    mainfunc: []const u8 = "python_script/env_init.py",
-    context: ?[]const u8 = null,
-    pub fn tostr() void {} //TODO implement tostr
-    pub fn execute_code(self: *const EnvHandler, code: []const u8, allocator: std.mem.Allocator) !std.process.Child.RunResult {
-        const result = try std.process.Child.run(.{
-            .allocator = allocator,
-            .argv = &[_][]const u8{ "python", self.mainfunc, code, self.context orelse "" },
-        });
-        return result;
-    }
-};
-
-test "EnvHandler execute_code" {
-    const allocator = std.testing.allocator;
-    const env = EnvHandler{
-        .mainfunc = "python_script/env_init.py",
-    };
-    const code = "for i in range(1):\n   print('Hello from EnvHandler')";
-    const result = try env.execute_code(code, allocator);
-    defer allocator.free(result.stdout);
-    defer allocator.free(result.stderr);
-    try std.testing.expectEqualStrings("Hello from EnvHandler\n", result.stdout);
-}
