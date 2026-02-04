@@ -22,7 +22,7 @@ test "quickstart runs without error" {
                 .model_name = "qwen-plus",
             },
             .environment = "local",
-            .environment_kwargs = "{}",
+            .environment_kwargs = "{\"mainfunc\": \"python_script/env_init.py\"}",
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,

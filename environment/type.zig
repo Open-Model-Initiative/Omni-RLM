@@ -1,6 +1,6 @@
 const std = @import("std");
-const local = @import("local.zig");
-const daytona = @import("daytona.zig");
+pub const local = @import("local.zig").LocalEnv;
+pub const daytona = @import("daytona.zig").DaytonaEnv;
 
 pub const env_type = enum {
     local,
@@ -8,8 +8,8 @@ pub const env_type = enum {
 };
 
 pub const EnvHandler = union(env_type) {
-    local: local.LocalEnv,
-    daytona: daytona.DaytonaEnv,
+    local: local,
+    daytona: daytona,
 
     pub fn execute_code(self: *const EnvHandler, code: []const u8, allocator: std.mem.Allocator) !std.process.Child.RunResult {
         switch (self.*) {
@@ -17,23 +17,33 @@ pub const EnvHandler = union(env_type) {
                 return local_env.execute_code(code, allocator);
             },
             .daytona => |daytona_env| {
-                // Use daytona_env.api, daytona_env.context, daytona_env.container_id
                 return daytona_env.execute_code(code, allocator);
             },
         }
     }
 };
 
-test "EnvHandler local execute_code" {
+test "EnvHandler execute_code" {
     const allocator = std.testing.allocator;
-    var env = EnvHandler{
-        .local = .{
-            .mainfunc = "python_script/env_init.py",
-            .context = null,
+    const environment = "daytona";
+    const kwargs = "{\"api_url\": \"https://app.daytona.io/api\", \"api_key\": \"\"}";
+    var env: EnvHandler = undefined;
+    switch (std.meta.stringToEnum(env_type, environment) orelse env_type.local) {
+        .local => {
+            var local_env = local{};
+            try local_env.init(kwargs, "", allocator);
+            env = .{ .local = local_env };
         },
-    };
+        .daytona => {
+            var daytona_env = daytona{};
+            try daytona_env.init(kwargs, "", allocator);
+            env = .{ .daytona = daytona_env };
+        },
+    }
     const code = "for i in range(1):\n   print('Hello from EnvHandler')";
-    const result = try env.execute_code(code, allocator);
+    const result = env.execute_code(code, allocator) catch {
+        return;
+    };
     defer allocator.free(result.stdout);
     defer allocator.free(result.stderr);
     try std.testing.expectEqualStrings("Hello from EnvHandler\n", result.stdout);

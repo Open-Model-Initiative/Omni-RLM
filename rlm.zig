@@ -136,10 +136,17 @@ pub const RLM = struct {
         //Setup environment handler
         //TODO add other environments support
         var env: environment.EnvHandler = undefined;
-        env = environment.EnvHandler{
-            .local = .{
-                .mainfunc = "python_script/env_init.py",
-                .context = prompt,
+        const env_type = std.meta.stringToEnum(environment.env_type, self.environment) orelse environment.env_type.local;
+        env = switch (env_type) {
+            .local => blk: {
+                var local_env = environment.local{};
+                try local_env.init(self.environment_kwargs, prompt, allocator);
+                break :blk .{ .local = local_env };
+            },
+            .daytona => blk: {
+                var daytona_env = environment.daytona{};
+                try daytona_env.init(self.environment_kwargs, prompt, allocator);
+                break :blk .{ .daytona = daytona_env };
             },
         };
         defer {

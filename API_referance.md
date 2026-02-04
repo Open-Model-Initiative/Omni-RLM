@@ -212,6 +212,7 @@ const messages = [_]Message{
 - **`user`**: User queries and inputs
 - **`assistant`**: Model responses and outputs
 
+<!-- TODO UPDATE deprecated -->
 ### EnvHandler - Code Execution Environment
 
 Manages Python code execution in a persistent environment using dill session state.
@@ -238,7 +239,7 @@ Executes Python code in the managed environment.
 **Errors:** Process execution errors
 
 #### Example
-
+<!-- TODO UPDATE deprecated-->
 ```zig
 const env = EnvHandler{
     .mainfunc = "python_script/env_init.py",
