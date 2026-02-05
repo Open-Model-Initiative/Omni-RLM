@@ -13,16 +13,16 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const run_fast = b.addExecutable(.{
-        .name = "run_ReleaseFast",
-        .root_module = b.addModule("fast", .{
-            .root_source_file = b.path("run.zig"),
-            .target = target,
-            .optimize = .ReleaseFast,
-        }),
-    });
+    // const run_fast = b.addExecutable(.{
+    //     .name = "run_ReleaseFast",
+    //     .root_module = b.addModule("fast", .{
+    //         .root_source_file = b.path("run.zig"),
+    //         .target = target,
+    //         .optimize = .ReleaseFast,
+    //     }),
+    // });
 
-    b.installArtifact(run_fast);
+    // b.installArtifact(run_fast);
     b.installArtifact(run_slow);
 
     const test_comp = b.addTest(.{
@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&test_artifact.step);
 
-    const run_artifact = b.addRunArtifact(run_fast);
+    const run_artifact = b.addRunArtifact(run_slow);
     const run_step = b.step("run", "Run the RLM example");
     run_step.dependOn(&run_artifact.step);
 }
