@@ -15,6 +15,11 @@ pub const LocalEnv = struct {
         self.* = parsed.value;
         self.context = prompt;
     }
+    pub fn deinit(self: *LocalEnv) void {
+        // clean up if necessary
+        _ = self;
+        std.fs.cwd().deleteFile("env.dill") catch {};
+    }
 };
 
 test "read json kwargs in LocalEnv" {

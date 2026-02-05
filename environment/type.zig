@@ -10,14 +10,33 @@ pub const env_type = enum {
 pub const EnvHandler = union(env_type) {
     local: local,
     daytona: daytona,
+    pub fn init(self: *EnvHandler, etype: env_type, kwargs: []const u8, prompt: []const u8, allocator: std.mem.Allocator) !void {
+        switch (etype) {
+            .local => {
+                var local_env = local{};
+                try local_env.init(kwargs, prompt, allocator);
+                self.* = .{ .local = local_env };
+            },
+        }
+    }
 
     pub fn execute_code(self: *const EnvHandler, code: []const u8, allocator: std.mem.Allocator) !std.process.Child.RunResult {
         switch (self.*) {
-            .local => |local_env| {
-                return local_env.execute_code(code, allocator);
+            .local => {
+                return self.local.execute_code(code, allocator);
             },
-            .daytona => |daytona_env| {
-                return daytona_env.execute_code(code, allocator);
+    pub fn deinit(self: *EnvHandler, allocator: std.mem.Allocator) !void {
+        switch (self.*) {
+            .local => {
+                self.local.deinit();
+            },
+        }
+    }
+    pub fn find_final_answer(self: *const EnvHandler, response: []const u8, allocator: std.mem.Allocator) !?[]const u8 {
+        switch (self.*) {
+            .local => {
+                return self.local.find_final_answer(response, allocator);
+            },
             },
         }
     }

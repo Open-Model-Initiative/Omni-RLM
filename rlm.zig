@@ -134,25 +134,10 @@ pub const RLM = struct {
         const timestart = std.time.milliTimestamp();
 
         //Setup environment handler
-        //TODO add other environments support
         var env: environment.EnvHandler = undefined;
         const env_type = std.meta.stringToEnum(environment.env_type, self.environment) orelse environment.env_type.local;
-        env = switch (env_type) {
-            .local => blk: {
-                var local_env = environment.local{};
-                try local_env.init(self.environment_kwargs, prompt, allocator);
-                break :blk .{ .local = local_env };
-            },
-            .daytona => blk: {
-                var daytona_env = environment.daytona{};
-                try daytona_env.init(self.environment_kwargs, prompt, allocator);
-                break :blk .{ .daytona = daytona_env };
-            },
-        };
-        defer {
-            // Clean up environment if needed
-            std.fs.cwd().deleteFile("env.dill") catch {};
-        }
+        try env.init(env_type, self.environment_kwargs, prompt, allocator);
+        defer env.deinit(allocator) catch {};
 
         //Setup model handler
         const lm_handler = ModelHandler{
@@ -196,7 +181,10 @@ pub const RLM = struct {
             std.debug.print("Execution Time: {d}ms\n", .{iteration.iteration_time});
             std.debug.print("===============================\n\n", .{});
 
-            try iteration.find_final_answer(allocator);
+            const final_answer = try env.find_final_answer(iteration.response, allocator);
+            if (final_answer != null) {
+                iteration.final_answer = final_answer;
+            }
 
             if (self.logger != null) {
                 try self.logger.?.log_iteration(iteration, allocator);
