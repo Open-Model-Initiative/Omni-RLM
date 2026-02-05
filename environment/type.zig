@@ -93,6 +93,12 @@ test "EnvHandler daytona execute_code" {
     //// Test with daytona environment
     const environment = "daytona";
     const kwargs = "{\"api_url\": \"https://app.daytona.io/api\", \"api_key\": \"\"}";
+    const parsed = try std.json.parseFromSlice(daytona, allocator, kwargs, .{});
+    defer parsed.deinit();
+    if (parsed.value.api_key.len == 0) {
+        std.debug.print("\nSkipping DaytonaEnv execute_code test due to missing daytona api_key.\n", .{});
+        return error.SkipZigTest;
+    }
 
     var env: EnvHandler = undefined;
     const Test_env_type = std.meta.stringToEnum(env_type, environment) orelse env_type.local;
