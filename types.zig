@@ -2,15 +2,10 @@ const std = @import("std");
 const json = std.json;
 const Value = json.Value;
 
-////********TODO********////
-//finish tostr implementations for each struct
-////*********************////
-
 pub const backendKwargs = struct {
     api_key: []const u8,
     base_url: []const u8,
     model_name: []const u8,
-    pub fn tostr() void {} //TODO implement tostr
 };
 
 pub const RLMMetadata = struct {
@@ -22,7 +17,6 @@ pub const RLMMetadata = struct {
     environment_type: ?[]const u8 = null,
     environment_kwargs: ?[]const u8 = null,
     other_backends: ?[]const u8 = null,
-    pub fn tostr() void {} //TODO implement tostr
 };
 
 ////TODO add split prompt metadata, now only support str context(multi types e.g. dict, list)
@@ -31,7 +25,6 @@ pub const QueryMetadata = struct {
     context_length: []const u32,
     context_total_length: u32,
     context_type: []const u8,
-    pub fn tostr() void {} //TODO implement tostr
 
     pub fn init(prompt: []const u8, allocator: std.mem.Allocator) QueryMetadata {
         const context_length = allocator.alloc(u32, 1) catch unreachable;
@@ -55,7 +48,6 @@ pub const RLMIteration = struct {
     code_blocks: CodeBlock, // TODO change to array in the future, when changing the function format_iteration need to be changed too
     final_answer: ?[]const u8 = null,
     iteration_time: i64,
-    pub fn tostr() void {} //TODO implement tostr
     pub fn format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) ![]Message {
         var Messages = try allocator.alloc(Message, 2);
 
@@ -84,8 +76,7 @@ pub const RLMChatCompletion = struct {
 
 pub const CodeBlock = struct {
     code: []const u8,
-    result: std.process.Child.RunResult,
-    pub fn tostr() void {} //TODO implement tostr
+    result: std.process.Child.RunResult, // TODO change the struct support locals, execution_time, rlm_calls.
     pub fn deinit(self: *CodeBlock, allocator: std.mem.Allocator) void {
         allocator.free(self.code);
         allocator.free(self.result.stderr);

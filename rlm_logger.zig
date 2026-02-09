@@ -2,6 +2,47 @@ const std = @import("std");
 const Metadata = @import("types.zig").RLMMetadata;
 const RLMIteration = @import("types.zig").RLMIteration;
 
+fn formatTimestampUtc(allocator: std.mem.Allocator, seconds: i64) ![]const u8 {
+    const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(seconds + 60 * 60 * 8) };
+    const epoch_day = epoch_seconds.getEpochDay();
+    const year_day = epoch_day.calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    const day_seconds = epoch_seconds.getDaySeconds();
+
+    return std.fmt.allocPrint(allocator, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0>6}", .{
+        year_day.year,
+        @intFromEnum(month_day.month),
+        month_day.day_index + 1,
+        day_seconds.getHoursIntoDay(),
+        day_seconds.getMinutesIntoHour(),
+        day_seconds.getSecondsIntoMinute(),
+        @as(u64, @intCast(@mod(std.time.microTimestamp(), 1000_000))),
+    });
+}
+test "time" {
+    const allocator = std.testing.allocator;
+    const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
+    defer allocator.free(timestamp_str);
+    std.debug.print("Current UTC time: {s}\n", .{timestamp_str});
+}
+
+fn formatTimestampUtcForFilename(allocator: std.mem.Allocator, seconds: i64) ![]const u8 {
+    const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(seconds + 60 * 60 * 8) };
+    const epoch_day = epoch_seconds.getEpochDay();
+    const year_day = epoch_day.calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    const day_seconds = epoch_seconds.getDaySeconds();
+
+    return std.fmt.allocPrint(allocator, "{d:0>4}{d:0>2}{d:0>2}_{d:0>2}-{d:0>2}-{d:0>2}", .{
+        year_day.year,
+        @intFromEnum(month_day.month),
+        month_day.day_index + 1,
+        day_seconds.getHoursIntoDay(),
+        day_seconds.getMinutesIntoHour(),
+        day_seconds.getSecondsIntoMinute(),
+    });
+}
+
 ///Logger for RLM iterations.
 ///
 ///Writes RLMIteration data to JSON-lines files for analysis and debugging.
@@ -20,7 +61,7 @@ pub const RLMLogger = struct {
         // Create log directory if it doesn't exist
         std.fs.Dir.makeDir(std.fs.cwd(), log_dir) catch {};
 
-        const timestamp_str = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+        const timestamp_str = try formatTimestampUtcForFilename(allocator, std.time.timestamp());
         defer allocator.free(timestamp_str);
 
         // Generate random 8-character hex ID
@@ -55,7 +96,21 @@ pub const RLMLogger = struct {
     }
 
     pub fn log_iteration(self: *RLMLogger, iteration_data: RLMIteration, allocator: std.mem.Allocator) !void {
-        const json_iteration = std.json.fmt(iteration_data, .{});
+        self.iteration_count += 1;
+        const data_string = try std.json.Stringify.valueAlloc(allocator, iteration_data, .{});
+        defer allocator.free(data_string);
+
+        var entry: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, data_string, .{});
+        defer entry.deinit();
+
+        const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
+        defer allocator.free(timestamp_str);
+
+        try entry.value.object.put("type", std.json.Value{ .string = "iteration" });
+        try entry.value.object.put("iteration", std.json.Value{ .integer = @intCast(self.iteration_count) });
+        try entry.value.object.put("timestamp", std.json.Value{ .string = timestamp_str });
+
+        const json_iteration = std.json.fmt(entry.value, .{});
         const str = try std.fmt.allocPrint(allocator, "{f}", .{json_iteration});
         defer allocator.free(str);
         try self.log(str);
@@ -64,12 +119,23 @@ pub const RLMLogger = struct {
     pub fn log_metadata(self: *RLMLogger, metadata: Metadata, allocator: std.mem.Allocator) !void {
         if (self.metadata_logged) return;
 
-        const json_metadata = std.json.fmt(metadata, .{});
+        const data_string = try std.json.Stringify.valueAlloc(allocator, metadata, .{});
+        defer allocator.free(data_string);
+
+        var entry: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, data_string, .{});
+        defer entry.deinit();
+
+        const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
+        defer allocator.free(timestamp_str);
+
+        try entry.value.object.put("type", std.json.Value{ .string = "metadata" });
+        try entry.value.object.put("timestamp", std.json.Value{ .string = timestamp_str });
+
+        const json_metadata = std.json.fmt(entry.value, .{});
         const str = try std.fmt.allocPrint(allocator, "{f}", .{json_metadata});
         defer allocator.free(str);
         try self.log(str);
 
-        self.iteration_count -= 1; // Don't count metadata as an iteration
         self.metadata_logged = true;
     }
 
@@ -86,8 +152,6 @@ pub const RLMLogger = struct {
         defer file.close();
         try file.writeAll(data);
         try file.writeAll("\n");
-
-        self.iteration_count += 1;
     }
 };
 
@@ -141,14 +205,4 @@ test "RLMLogger log_metadata" {
     };
 
     try logger.log_metadata(metadata, allocator);
-
-    // const json_metadata = std.json.fmt(metadata, .{});
-    // const str = try std.fmt.allocPrint(allocator, "{f}", .{json_metadata});
-    // defer allocator.free(str);
-    // const file = try std.fs.cwd().openFile(logger.log_file_path, .{});
-    // defer file.close();
-    // var reader = file.reader(&.{});
-    // const line: []u8 = try reader.interface.allocRemaining(allocator, std.Io.Limit.unlimited);
-    // defer allocator.free(line);
-    // std.debug.print("{s}", .{line});
 }
