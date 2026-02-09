@@ -104,15 +104,15 @@ Formats the iteration into message array for next iteration.
 **Returns:** Array of messages containing assistant response and system feedback  
 **Errors:** Memory allocation errors
 
-##### `find_final_answer(self: *RLMIteration, allocator: std.mem.Allocator) !void`
-
+##### `find_final_answer(self: *RLMIteration, allocator: std.mem.Allocator) !void`(deprecated)
+(This method is deprecated and will be removed in a future release. Use the newer prompt formatting utilities instead.)
 Searches for and extracts the final answer from the response using Python regex matching.
 
 **Side Effects:** Sets `self.final_answer` if a final answer is found  
 **Pattern:** Matches `FINAL(...)` or `FINAL_VAR(...)` in response text
 
 #### Example
-
+// TO BE UPDATED
 ```zig
 var iteration = RLMIteration{
     .prompt = &messages,

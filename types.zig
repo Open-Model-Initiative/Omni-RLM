@@ -72,60 +72,7 @@ pub const RLMIteration = struct {
         };
         return Messages;
     }
-
-    pub fn find_final_answer(self: *RLMIteration, allocator: std.mem.Allocator) !void {
-        const text = self.response;
-        const res = try std.process.Child.run(.{
-            .allocator = allocator,
-            .argv = &[_][]const u8{
-                "python",
-                "python_script/find_final_answer.py",
-                text,
-            },
-        });
-        defer allocator.free(res.stdout);
-        defer allocator.free(res.stderr);
-        if (std.mem.eql(u8, res.stdout, "None\n") or res.stderr.len != 0 or res.stdout.len == 0) {} else {
-            self.final_answer = try allocator.dupe(u8, res.stdout);
-        }
-    }
 };
-
-test "RLMIteration find_final_answer" {
-    std.fs.cwd().access("env.dill", .{}) catch {
-        std.debug.print("\n\"env.dill\" not found, skipping RLMIteration find_final_answer test\n", .{});
-        return error.SkipZigTest;
-    };
-    const allocator = std.testing.allocator;
-    var iteration = RLMIteration{
-        .prompt = &[_]Message{},
-        .response =
-        \\FINAL(result)\n```
-        ,
-        .code_blocks = CodeBlock{
-            .code = "",
-            .result = std.process.Child.RunResult{
-                .stdout = "",
-                .stderr = "",
-                .term = .{ .Exited = 0 },
-            },
-        },
-        .final_answer = null,
-        .iteration_time = 123,
-    };
-
-    try iteration.find_final_answer(allocator);
-    defer {
-        if (iteration.final_answer) |fa| {
-            allocator.free(fa);
-        }
-    }
-    if (iteration.final_answer == null) {
-        std.debug.print("\nNo final answer found\n", .{});
-    } else {
-        std.debug.print("\nFinal answer: {s}\n", .{iteration.final_answer.?});
-    }
-}
 
 pub const RLMChatCompletion = struct {
     root_model: []const u8,

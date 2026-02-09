@@ -20,6 +20,24 @@ pub const LocalEnv = struct {
         _ = self;
         std.fs.cwd().deleteFile("env.dill") catch {};
     }
+    pub fn find_final_answer(self: *const LocalEnv, text: []const u8, allocator: std.mem.Allocator) !?[]const u8 {
+        _ = self;
+        const res = try std.process.Child.run(.{
+            .allocator = allocator,
+            .argv = &[_][]const u8{
+                "python",
+                "python_script/find_final_answer.py",
+                text,
+            },
+        });
+        defer allocator.free(res.stdout);
+        defer allocator.free(res.stderr);
+        if (std.mem.eql(u8, res.stdout, "None\n") or res.stderr.len != 0 or res.stdout.len == 0) {
+            return null;
+        } else {
+            return try allocator.dupe(u8, res.stdout);
+        }
+    }
 };
 
 test "read json kwargs in LocalEnv" {
