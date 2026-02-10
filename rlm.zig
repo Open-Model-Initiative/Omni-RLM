@@ -158,7 +158,13 @@ pub const RLM = struct {
         defer allocator.free(current_prompt);
 
         for (0..self.max_iterations) |i| {
-            const user_prompt = try PROMPT.buildUserPrompt(root_prompt, @intCast(i), allocator);
+            const user_prompt = try PROMPT.buildUserPrompt(
+                .{
+                    .root_prompt = root_prompt,
+                    .iteration = @intCast(i),
+                },
+                allocator,
+            );
 
             defer PROMPT.ReleaseMessageArray(user_prompt, allocator);
             current_prompt = try allocator.realloc(current_prompt, message_history.len + user_prompt.len);

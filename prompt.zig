@@ -93,21 +93,83 @@ pub const USER_PROMPT_WITH_ROOT: []const u8 =
 ;
 
 /// Build user prompt based on root_prompt and iteration number
-pub fn buildUserPrompt(root_prompt: ?[]const u8, iteration: u32, allocator: std.mem.Allocator) ![]Message {
+pub fn buildUserPrompt(
+    input_parameters: struct {
+        root_prompt: ?[]const u8 = null,
+        iteration: u32 = 0,
+        context_count: u32 = 1,
+        history_count: u32 = 0,
+    },
+    allocator: std.mem.Allocator,
+) ![]Message {
+    const root_prompt = input_parameters.root_prompt;
+    const iteration = input_parameters.iteration;
+    const context_count = input_parameters.context_count;
+    const history_count = input_parameters.history_count;
     var prompt: []const u8 = undefined;
 
     if (iteration == 0) {
         const safeguard = "You have not interacted with the REPL environment or seen your prompt / context yet. Your next action should be to look through and figure out how to answer the prompt, so don't just provide a final answer yet.\n\n";
         if (root_prompt != null) {
-            const plug_in_root_prompt = try std.fmt.allocPrint(allocator, USER_PROMPT_WITH_ROOT, .{root_prompt.?});
+            const plug_in_root_prompt = try std.fmt.allocPrint(
+                allocator,
+                USER_PROMPT_WITH_ROOT,
+                .{root_prompt.?},
+            );
             defer allocator.free(plug_in_root_prompt);
-            prompt = try std.fmt.allocPrint(allocator, "{s}{s}", .{ safeguard, plug_in_root_prompt });
+            prompt = try std.fmt.allocPrint(
+                allocator,
+                "{s}{s}",
+                .{ safeguard, plug_in_root_prompt },
+            );
         } else {
-            prompt = try std.fmt.allocPrint(allocator, "{s}{s}", .{ safeguard, USER_PROMPT });
+            prompt = try std.fmt.allocPrint(
+                allocator,
+                "{s}{s}",
+                .{ safeguard, USER_PROMPT },
+            );
         }
     } else {
-        prompt = try std.fmt.allocPrint(allocator, "{s}{s}", .{ "The history before is your previous interactions with the REPL environment. ", USER_PROMPT });
+        prompt = try std.fmt.allocPrint(
+            allocator,
+            "{s}{s}",
+            .{ "The history before is your previous interactions with the REPL environment. ", USER_PROMPT },
+        );
     }
+
+    if (context_count > 1) {
+        const Note = try std.fmt.allocPrint(
+            allocator,
+            "\n\nNote: You have {d} contexts available (context_0 through context_{d}).",
+            .{ context_count, context_count - 1 },
+        );
+        defer allocator.free(Note);
+        const new_prompt = std.mem.concat(allocator, u8, &.{ prompt, Note }) catch unreachable;
+        allocator.free(prompt);
+        prompt = new_prompt;
+    }
+
+    if (history_count > 0) {
+        var Note: []u8 = undefined;
+        if (history_count == 1) {
+            Note = try std.fmt.allocPrint(
+                allocator,
+                "\n\nNote: You have 1 prior conversation history available in the `history` variable.",
+                .{},
+            );
+        } else {
+            Note = try std.fmt.allocPrint(
+                allocator,
+                "\n\nNote: You have {d} prior conversation histories available (history_0 through history_{d}).",
+                .{ history_count, history_count - 1 },
+            );
+        }
+        defer allocator.free(Note);
+        const new_prompt = std.mem.concat(allocator, u8, &.{ prompt, Note }) catch unreachable;
+        allocator.free(prompt);
+        prompt = new_prompt;
+    }
+
     const message = Message{
         .role = "user",
         .content = prompt,
@@ -120,36 +182,92 @@ pub fn buildUserPrompt(root_prompt: ?[]const u8, iteration: u32, allocator: std.
 test "buildUserPrompt works" {
     const allocator = std.testing.allocator;
     {
-        const prompt_no_root = try buildUserPrompt(null, 0, allocator);
+        const prompt_no_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 0 }, allocator);
         defer ReleaseMessageArray(prompt_no_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_no_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 0)\n{f}\n", .{formatter});
     }
     {
-        const prompt_with_root = try buildUserPrompt("What is the capital of France?", 0, allocator);
+        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 0 }, allocator);
         defer ReleaseMessageArray(prompt_with_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt with root:\n{f}\n", .{formatter});
     }
     {
-        const prompt_without_root = try buildUserPrompt(null, 1, allocator);
+        const prompt_without_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 1 }, allocator);
         defer ReleaseMessageArray(prompt_without_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_without_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 1)\n{f}\n", .{formatter});
+    }
+    {
+        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .context_count = 2 }, allocator);
+        defer ReleaseMessageArray(prompt_with_root, allocator);
+        const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
+        const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, context_count 2)\n{f}\n", .{formatter}) catch unreachable;
+        defer allocator.free(out_string);
+        try std.testing.expectStringEndsWith(out_string, "Note: You have 2 contexts available (context_0 through context_1).\"}]}\n");
+    }
+    {
+        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .history_count = 1 }, allocator);
+        defer ReleaseMessageArray(prompt_with_root, allocator);
+        const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
+        const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, history_count 1)\n{f}\n", .{formatter}) catch unreachable;
+        defer allocator.free(out_string);
+        try std.testing.expectStringEndsWith(out_string, "Note: You have 1 prior conversation history available in the `history` variable.\"}]}\n");
     }
 }
 
 ///you need to release the `system_prompt` and `system_prompt[1].content` after use
 pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) ![]Message {
-    const tes: []u8 = try std.fmt.allocPrint(allocator, "Your context is a {s} with {d} total characters, and is broken up into chunks of char lengths: {any}.", .{ query_metadata.context_type, query_metadata.context_total_length, query_metadata.context_length });
+    const context_lengths = query_metadata.context_length;
+    const context_total_length = query_metadata.context_total_length;
+    const context_type = query_metadata.context_type;
+    var context_lengths_str: []u8 = undefined;
+
+    if (context_lengths.len > 100) {
+        const others = context_lengths.len - 100;
+        context_lengths_str = try std.fmt.allocPrint(
+            allocator,
+            "[{any}] ... [{d} others]",
+            .{ context_lengths[0..100], others },
+        );
+    } else {
+        context_lengths_str = try std.fmt.allocPrint(
+            allocator,
+            "{any}",
+            .{context_lengths},
+        );
+    }
+    defer allocator.free(context_lengths_str);
+
+    const tes: []u8 = try std.fmt.allocPrint(
+        allocator,
+        "Your context is a {s} with {d} total characters, and is broken up into chunks of char lengths: {s}.",
+        .{
+            context_type,
+            context_total_length,
+            context_lengths_str,
+        },
+    );
     var system_content: []u8 = undefined;
     if (custom_system_prompt != null) {
-        system_content = try std.fmt.allocPrint(allocator, "{s}", .{custom_system_prompt.?});
+        system_content = try std.fmt.allocPrint(
+            allocator,
+            "{s}",
+            .{custom_system_prompt.?},
+        );
     } else {
-        system_content = try std.fmt.allocPrint(allocator, "{s}", .{RLM_SYSTEM_PROMPT});
+        system_content = try std.fmt.allocPrint(
+            allocator,
+            "{s}",
+            .{RLM_SYSTEM_PROMPT},
+        );
     }
 
-    const Msg = [2]Message{ Message{ .role = "system", .content = system_content }, Message{ .role = "assistant", .content = tes } };
+    const Msg = [2]Message{
+        Message{ .role = "system", .content = system_content },
+        Message{ .role = "assistant", .content = tes },
+    };
     const system_prompt = try allocator.dupe(Message, &Msg);
     return system_prompt;
 }
@@ -157,14 +275,13 @@ pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: Quer
 test "buildSystemPrompt works" {
     const allocator = std.testing.allocator;
     const query_metadata: QueryMetadata = .{
-        .context_length = &[1]u32{16},
+        .context_length = &[2]u32{ 10, 20 },
         .context_total_length = 16,
         .context_type = "str",
     };
     const system_prompt = try buildSystemPrompt(null, query_metadata, allocator);
     defer ReleaseMessageArray(system_prompt, allocator);
     const formatter = std.json.fmt(.{ .message = system_prompt }, .{});
-    // const out = try std.fmt.allocPrint(allocator, "{f}", .{formatter});
 
     std.debug.print("\nTESTING:System Prompt\n{f}\n", .{formatter});
 }
