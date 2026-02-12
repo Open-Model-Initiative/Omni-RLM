@@ -3,7 +3,7 @@ const RLMLogger = @import("rlm_logger.zig").RLMLogger;
 const std = @import("std");
 const RLM = @import("rlm.zig").RLM;
 
-test "quickstart runs without error" {
+test "quickstart run" {
     std.debug.print("\n*******RLM started*******\n", .{});
 
     const allocator = std.testing.allocator;

@@ -23,7 +23,7 @@ test "time" {
     const allocator = std.testing.allocator;
     const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
     defer allocator.free(timestamp_str);
-    std.debug.print("Current UTC time: {s}\n", .{timestamp_str});
+    std.debug.print("\nCurrent UTC time: {s}\n", .{timestamp_str});
 }
 
 fn formatTimestampUtcForFilename(allocator: std.mem.Allocator, seconds: i64) ![]const u8 {
@@ -167,6 +167,7 @@ test "RLMLogger initialization" {
 
 test "RLMLogger log_iteration" {
     const Message = @import("types.zig").Message;
+    const CodeBlock = @import("types.zig").CodeBlock;
     const allocator = std.testing.allocator;
     var logger = try RLMLogger.init("./logs", "Test rlmiteration", allocator);
     defer logger.deinit(allocator);
@@ -174,12 +175,20 @@ test "RLMLogger log_iteration" {
     const iteration_data: RLMIteration = .{
         .prompt = allocator.dupe(Message, &.{Message{ .role = "user", .content = "Calculate 1+1" }}) catch unreachable,
         .response = "1+1=2",
-        .code_blocks = .{ .code = "print(1+1)", .result = .{ .stdout = "", .stderr = "", .term = .{ .Exited = 0 } } },
+        .code_blocks = allocator.dupe(CodeBlock, &.{CodeBlock{
+            .code = "print(1+1)",
+            .result = .{
+                .stdout = "",
+                .stderr = "",
+                .term = .{ .Exited = 0 },
+            },
+        }}) catch unreachable,
         .final_answer = "2",
         .iteration_time = 10,
     };
     defer {
         allocator.free(iteration_data.prompt);
+        allocator.free(iteration_data.code_blocks);
     }
 
     try logger.log_iteration(iteration_data, allocator);

@@ -178,7 +178,10 @@ pub const RLM = struct {
             var iteration: RLMIteration = try self.completion_turn(current_prompt, lm_handler, env, allocator);
             defer {
                 allocator.free(iteration.response);
-                iteration.code_blocks.deinit(allocator);
+                for (0..iteration.code_blocks.len) |index| {
+                    iteration.code_blocks[index].deinit(allocator);
+                }
+                allocator.free(iteration.code_blocks);
             }
 
             // Print iteration summary with response
@@ -222,19 +225,24 @@ pub const RLM = struct {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();
         const response = try lm_handler.make_request(prompt, allocator); //TODO find out what is the difference between @This() and *T
-        const code_block_str = try find_code_blocks(response, allocator);
+        var code_block_strs = try find_code_blocks(response, allocator);
+        defer code_block_strs.deinit(allocator);
+        var code_blocks: std.ArrayList(CodeBlock) = .empty;
+        defer code_blocks.deinit(allocator);
 
-        const code_result = try env.execute_code(code_block_str, allocator);
+        for (code_block_strs.items) |code_block_str| {
+            const code_result = try env.execute_code(code_block_str, allocator);
+            try code_blocks.append(allocator, CodeBlock{
+                .code = try allocator.dupe(u8, code_block_str),
+                .result = code_result,
+            });
+        }
 
-        const code_blocks: CodeBlock = .{
-            .code = code_block_str,
-            .result = code_result,
-        };
         const iter_time = std.time.milliTimestamp() - iter_start;
         return RLMIteration{
             .prompt = prompt,
             .response = response,
-            .code_blocks = code_blocks,
+            .code_blocks = try code_blocks.toOwnedSlice(allocator),
             .iteration_time = iter_time,
             .final_answer = null,
         };

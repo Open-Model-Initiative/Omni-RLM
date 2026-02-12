@@ -45,23 +45,28 @@ pub const RLMIteration = struct {
     prompt: []Message,
     ///repl like response from LM
     response: []const u8,
-    code_blocks: CodeBlock, // TODO change to array in the future, when changing the function format_iteration need to be changed too
+    code_blocks: []CodeBlock,
     final_answer: ?[]const u8 = null,
     iteration_time: i64,
     pub fn format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) ![]Message {
-        var Messages = try allocator.alloc(Message, 2);
-
+        var Messages = try allocator.alloc(Message, self.code_blocks.len + 1);
         Messages[0] = Message{
             .role = "assistant",
             .content = try allocator.dupe(u8, self.response),
         };
-        const code = self.code_blocks.code;
-        const result = try std.fmt.allocPrint(allocator, "STDOUT:\n{s}\n\nSTDERR:\n{s}\n\n", .{ self.code_blocks.result.stdout, self.code_blocks.result.stderr });
-        defer allocator.free(result);
-        Messages[1] = Message{
-            .role = "system",
-            .content = try std.fmt.allocPrint(allocator, "Code executed:\n```python\n{s}\n```\nREPL output::\n{s}", .{ code, result }),
-        };
+        for (0..self.code_blocks.len) |index| {
+            const code = self.code_blocks[index].code;
+            const result = try std.fmt.allocPrint(
+                allocator,
+                "STDOUT:\n{s}\n\nSTDERR:\n{s}\n\n",
+                .{ self.code_blocks[index].result.stdout, self.code_blocks[index].result.stderr },
+            );
+            defer allocator.free(result);
+            Messages[index + 1] = Message{
+                .role = "user",
+                .content = try std.fmt.allocPrint(allocator, "Code executed:\n```python\n{s}\n```\nREPL output::\n{s}", .{ code, result }),
+            };
+        }
         return Messages;
     }
 };
