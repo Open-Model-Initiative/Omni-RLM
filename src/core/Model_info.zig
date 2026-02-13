@@ -45,11 +45,11 @@ pub const ModelHandler = struct {
 test "ModelHandler_make_request" {
     const allocator = std.testing.allocator;
     //if you need to test model request, please provide valid api_key
-    var model_handler = ModelHandler{ .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", .api_key = "", .model_name = "qwen-plus" };
-    if (model_handler.api_key.len == 0) {
-        std.debug.print("\nSkipping ModelHandler_make_request test due to missing api_key.\n", .{});
+    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
         return error.SkipZigTest;
-    }
+    };
+    defer allocator.free(api_key);
+    var model_handler = ModelHandler{ .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", .api_key = api_key, .model_name = "qwen-plus" };
     const to_be_post_messages = try allocator.alloc(Message, 1);
     defer allocator.free(to_be_post_messages);
     to_be_post_messages[0] = Message{
@@ -59,5 +59,5 @@ test "ModelHandler_make_request" {
 
     const result = try model_handler.make_request(to_be_post_messages, allocator);
     defer allocator.free(result);
-    std.debug.print("\n{s}\n", .{result});
+    std.debug.print("\nModel response:\n{s}\n", .{result});
 }
