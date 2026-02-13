@@ -1,19 +1,16 @@
 // Please provide valid api_key in the RLM initialization to run this quickstart example or it will return an attempt to use null value error.
-const RLMLogger = @import("rlm_logger.zig").RLMLogger;
+const RLMLogger = @import("omni-rlm").RLMLogger;
 const std = @import("std");
-const RLM = @import("rlm.zig").RLM;
+const RLM = @import("omni-rlm").RLM;
 
-pub fn main() !void {
-    const allocator = std.heap.page_allocator;
-    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
-        std.debug.print("Environment variable DASHSCOPE_API_KEY is not set.\n", .{});
-        return error.MissingApiKey;
-    };
-    defer allocator.free(api_key);
-
+test "quickstart run" {
     std.debug.print("\n*******RLM started*******\n", .{});
 
-    const logger = try RLMLogger.init("./logs", "run", allocator);
+    const allocator = std.testing.allocator;
+    const api_key = try std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY");
+    defer allocator.free(api_key);
+
+    const logger = try RLMLogger.init("./logs", "quickstart", allocator);
 
     var rlm: RLM =
         .{
@@ -21,12 +18,11 @@ pub fn main() !void {
             // must provide full information of api_key, base_url, model_name in json format
             .backend_kwargs = .{
                 .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                // .api_key = "",
                 .api_key = api_key,
-                .model_name = "qwen-flash",
+                .model_name = "qwen-plus",
             },
             .environment = "local",
-            .environment_kwargs = "{\"mainfunc\": \"python_script/env_init.py\"}",
+            .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,

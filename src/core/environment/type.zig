@@ -64,7 +64,7 @@ test "EnvHandler local execute_code" {
 
     //// Test with local environment
     const environment = "local";
-    const kwargs = "{\"mainfunc\": \"python_script/env_init.py\"}";
+    const kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}";
 
     var env: EnvHandler = undefined;
     const Test_env_type = std.meta.stringToEnum(env_type, environment) orelse env_type.local;
