@@ -8,6 +8,8 @@
 
 *Leverage the power of recursive reasoning in AI agents with type-safe, high-performance Zig*
 
+中文文档: [README_CN.md](README_CN.md)
+
 [Overview](#-overview) •
 [Features](#-features) •
 [Installation](#installation) •
@@ -50,37 +52,52 @@ Omni-RLM is a **high-performance [recursive language model framework](https://gi
 ### Prerequisites
 
 - [Zig](https://ziglang.org/download/) 0.15.2 or later
-- Python package `dill` for code execution environment
+- Python package `dill` for code execution in the 
+
+### Installation Steps
+1. Clone the repository:
+```bash
+git clone https://github.com/Open-Model-Initiative/Omni-RLM.git
+cd Omni-RLM
+```
+2. Install Python dependencies:
+```bash
+pip install dill # Only needed if executing code in local environment
+``` 
 
 ## 🚀 Quick Start
 
 Here's a simple example to get you started:
 
+```bash
+zig build run
+```
+
 IMPORTANT: Replace `"your-api-key-here"` with your actual API key.
 
 ```zig
+!src/example/run.zig
+
 const std = @import("std");
-const RLM = @import("rlm.zig").RLM;
-const RLMLogger = @import("rlm_logger.zig").RLMLogger;
+const RLM = @import("omni-rlm.zig").RLM;
+const RLMLogger = @import("omni-rlm.zig").RLMLogger;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     // Initialize logger
-    const logger = try RLMLogger.init("./logs", "quickstart", allocator);
+    const logger = try RLMLogger.init("./logs", "run", allocator);
 
     // Configure RLM instance
     var rlm: RLM = .{
         .backend = "openai",
-        .backend_kwargs = 
-        \\{
-        \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-        \\"api_key":"your-api-key-here",
-        \\"model_name":"qwen-plus"
-        \\}
-        ,
+        .backend_kwargs = .{
+            .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            .api_key = "sk-your-api-key-here",
+            .model_name = "qwen-plus",
+        },
         .environment = "local",
-        .environment_kwargs = "{}",
+        .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
@@ -101,7 +118,7 @@ pub fn main() !void {
     std.debug.print("Response: {s}\n", .{result.response});
     std.debug.print("Execution Time: {d}ms\n", .{result.execution_time});
 }
-```
+``` 
 
 ## 💡 Usage Examples
 
@@ -113,13 +130,11 @@ pub fn main() !void {
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://api.openai.com/v1/chat/completions",
-    \\"api_key":"sk-...",
-    \\"model_name":"gpt-4"
-    \\}
-    ,
+    .backend_kwargs = .{
+        .base_url = "https://api.openai.com/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "gpt-4",
+    },
     .max_depth = 3,
     .max_iterations = 50,
     .allocator = allocator,
@@ -133,13 +148,11 @@ var rlm: RLM = .{
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-    \\"api_key":"sk-...",
-    \\"model_name":"qwen-plus"
-    \\}
-    ,
+    .backend_kwargs = .{
+        .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "qwen-plus",
+    },
     .max_depth = 2,
     .allocator = allocator,
 };
@@ -152,13 +165,11 @@ var rlm: RLM = .{
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://your-custom-api.com/v1/chat/completions",
-    \\"api_key":"your-api-key",
-    \\"model_name":"your-model"
-    \\}
-    ,
+    .backend_kwargs = .{
+        .base_url = "https://your-custom-api.com/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "your-model",
+    },
     .custom_system_prompt = "You are a specialized coding assistant...",
     .allocator = allocator,
 };
@@ -173,14 +184,16 @@ The logger creates structured JSON logs that include:
 {
   "prompt": [{"role":"Your prompt concat with system message"}...],
   "response": "Model response",
-  "code_blocks": {
-    "code": "extracted code blocks if any",
-    "results": {
-        "stdout": "output from code execution",
-        "stderr": "error output if any",
-        "term": "exit status"
-    }
-  },
+    "code_blocks": [
+        {
+            "code": "extracted code block if any",
+            "result": {
+                "stdout": "output from code execution",
+                "stderr": "error output if any",
+                "term": "exit status"
+            }
+        }
+    ],
   "final_answer": "Extracted final answer if any",
   "execution_time": 1234//milliseconds
 }
@@ -189,59 +202,61 @@ The logger creates structured JSON logs that include:
 ## 📁 Project Structure
 
 ```
-rlm-zig/
-├── rlm.zig              # Core RLM orchestrator
-├── rlm_logger.zig       # Structured logging system
-├── types.zig            # Type definitions and structs
-├── prompt.zig           # Prompt construction utilities
-├── parsing.zig          # Response parsing (code blocks, answers)
-├── Model_info.zig       # Model configuration and metadata
-├── quickstart.zig       # Example usage and integration tests
+Omni-RLM/
+├── src/
+│   ├── omni-rlm.zig          # Public exports (RLM, RLMLogger)
+│   ├── core/
+│   │   ├── rlm.zig           # Core RLM orchestrator
+│   │   ├── rlm_logger.zig    # Structured logging system
+│   │   ├── types.zig         # Type definitions and structs
+│   │   ├── prompt.zig        # Prompt construction utilities
+│   │   ├── parsing.zig       # Response parsing (code blocks)
+│   │   ├── Model_info.zig    # Model configuration and metadata
+│   │   └── environment/
+│   │       ├── type.zig      # EnvHandler and env types
+│   │       ├── local.zig     # Local Python runner
+│   │       └── daytona.zig   # Daytona runner
+│   ├── example/
+│   │   ├── quickstart.zig    # Example usage (use for debug and testing)
+│   │   └── run.zig           # Example runner
+│   └── python_script/
+│       ├── env_init.py       # Environment initialization script
+│       ├── find_code_blocks.py
+│       └── find_final_answer.py
 ├── API_referance.md     # API reference documentation
-├── python_script/       # Python utility scripts
-│   ├── env_init.py      # Environment initialization script
-│   ├── find_code_blocks.py   # Python utility for code extraction
-│   └── find_final_answer.py  # Python utility for answer parsing
-├── logs/                # Generated log files (JSON format)
-├── zig-out/             # Build output directory
-│   └── bin/             # Compiled binaries
-├── .gitignore           # Git ignore rules
+├── build.zig
+├── build.zig.zon
+├── LICENSE
 └── README.md            # This file
 ```
 
 ### Key Files
 
-- **`rlm.zig`**: Main entry point with RLM struct and completion logic
-- **`rlm_logger.zig`**: Handles all logging operations with JSON output
-- **`types.zig`**: Shared type definitions (Metadata, QueryMetadata, etc.)
-- **`prompt.zig`**: System prompt building from query metadata
-- **`parsing.zig`**: Utilities to extract structured data from responses
-- **`quickstart.zig`**: Runnable example demonstrating basic usage
-- **`Model_info.zig`**: Model configurations and capabilities
+- **`src/omni-rlm.zig`**: Package interface
+- **`src/core/rlm.zig`**: Main entry point with RLM struct and completion logic
+- **`src/core/rlm_logger.zig`**: Handles all logging operations with JSON output
+- **`src/core/types.zig`**: Shared type definitions (metadata, message, code blocks)
+- **`src/core/prompt.zig`**: System prompt building from query metadata
+- **`src/core/parsing.zig`**: Utilities to extract structured data from responses
+- **`src/core/Model_info.zig`**: Model configurations and capabilities
 
-## 🧪 test
+## 🧪 Test
 
-run test：
+Run tests：
 
 ```bash
-zig test rlm.zig
-zig test rlm_logger.zig
-zig test prompt.zig
-zig test parsing.zig
-zig test Model_info.zig
-zig test types.zig
+zig build test
 ```
 
 run quickstart example：
 
 ```bash
-zig test quickstart.zig
+zig build quickstart
 ```
 
 ## 📖 Documentation
 
 - [API Referance](API_referance.md) - Complete API documentation
-- [quickstart](quickstart.zig) - Runnable code examples
 
 ## 📖 Roadmap
 

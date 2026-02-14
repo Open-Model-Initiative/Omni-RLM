@@ -149,7 +149,7 @@ pub const RLMLogger = struct {
         self.metadata_logged = true;
     }
 
-    pub fn log(self: *RLMLogger, data: []const u8) !void {
+    fn log(self: *RLMLogger, data: []const u8) !void {
         var file: std.fs.File = undefined;
         file = std.fs.cwd().createFile(self.log_file_path, .{
             .exclusive = true,

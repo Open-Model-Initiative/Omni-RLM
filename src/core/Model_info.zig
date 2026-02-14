@@ -3,6 +3,7 @@ const Client = std.http.Client;
 const Request = Client.Request;
 const Message = @import("types.zig").Message;
 
+// TODO only support openai backend for now, we will add more backend support in the future
 pub const ModelHandler = struct {
     base_url: []const u8 = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
     api_key: []const u8 = "",

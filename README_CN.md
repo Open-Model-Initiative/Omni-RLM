@@ -1,12 +1,14 @@
 <div align="center">
 
-# Omni-Zig
+# Omni-RLM
 
 ### 高性能递归语言模型框架
 
 [![Zig](https://img.shields.io/badge/Zig-0.15.2-orange.svg)](https://ziglang.org/)
 
 *利用 Zig 的类型安全和高性能特性，释放 AI 代理递归推理的强大能力*
+
+English README: [README.md](README.md)
 
 [概述](#-概述) •
 [特性](#-特性) •
@@ -20,9 +22,9 @@
 
 ## 📖 概述
 
-Omni-Zig 是一个**高性能递归语言模型框架**，使 AI 代理能够通过可控的递归 LLM 调用执行复杂的推理任务。借助 Zig 的零成本抽象和内存安全特性，它为生产级 AI 应用提供了坚实的基础。
+Omni-RLM 是一个**高性能递归语言模型框架**，使 AI 代理能够通过可控的递归 LLM 调用执行复杂的推理任务。借助 Zig 的零成本抽象和内存安全特性，它为生产级 AI 应用提供了坚实的基础。
 
-### 为什么选择 Omni-Zig？
+### 为什么选择 Omni-RLM？
 
 - 🚀 **极速性能**: 利用 Zig 的零成本抽象和手动内存管理实现最优性能
 - 🔄 **递归推理**: 支持多层次语言模型调用，提供精细的控制
@@ -47,50 +49,52 @@ Omni-Zig 是一个**高性能递归语言模型框架**，使 AI 代理能够通
 ### 前置要求
 
 - [Zig](https://ziglang.org/download/) 0.15.2 或更高版本
-- Python 包 `dill`（用于代码执行环境）
+- Python 包 `dill`（仅在本地环境执行代码时需要）
 
 ### 安装步骤
 
 1. 克隆仓库：
 ```bash
-git clone <repository-url>
-cd Omni-zig
+git clone https://github.com/Open-Model-Initiative/Omni-RLM.git
+cd Omni-RLM
 ```
 
 2. 安装 Python 依赖：
 ```bash
-pip install dill
+pip install dill # 仅在本地环境执行代码时需要
 ```
 
 ## 🚀 快速开始
 
 以下是一个简单的入门示例：
 
+```bash
+zig build run
+```
+
 **注意：请更换api_key为你自己的API密钥。**
 
 ```zig
 const std = @import("std");
-const RLM = @import("rlm.zig").RLM;
-const RLMLogger = @import("rlm_logger.zig").RLMLogger;
+const RLM = @import("omni-rlm.zig").RLM;
+const RLMLogger = @import("omni-rlm.zig").RLMLogger;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     // 初始化日志记录器
-    const logger = try RLMLogger.init("./logs", "quickstart", allocator);
+    const logger = try RLMLogger.init("./logs", "run", allocator);
 
     // 配置 RLM 实例
     var rlm: RLM = .{
         .backend = "openai",
-        .backend_kwargs = 
-        \\{
-        \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-        \\"api_key":"你的API密钥",
-        \\"model_name":"qwen-plus"
-        \\}
-        ,
+        .backend_kwargs = .{
+            .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            .api_key = "Bearer 你的API密钥",
+            .model_name = "qwen-plus",
+        },
         .environment = "local",
-        .environment_kwargs = "{}",
+        .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
@@ -117,57 +121,57 @@ pub fn main() !void {
 
 ### 配置不同的后端
 
-#### OpenAI GPT-4
+<details>
+<summary><b>OpenAI GPT-4</b></summary>
 
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://api.openai.com/v1/chat/completions",
-    \\"api_key":"sk-你的密钥",
-    \\"model_name":"gpt-4"
-    \\}
-    ,
+    .backend_kwargs = .{
+        .base_url = "https://api.openai.com/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "gpt-4",
+    },
     .max_depth = 3,
     .max_iterations = 50,
     .allocator = allocator,
 };
 ```
+</details>
 
-#### Qwen（阿里云）
+<details>
+<summary><b>Qwen (Alibaba Cloud)</b></summary>
 
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-    \\"api_key":"sk-你的密钥",
-    \\"model_name":"qwen-plus"
-    \\}
-    ,
+    .backend_kwargs = .{
+        .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "qwen-plus",
+    },
     .max_depth = 2,
     .allocator = allocator,
 };
 ```
+</details>
 
-#### 自定义后端
+<details>
+<summary><b>Custom Backend</b></summary>
 
 ```zig
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = 
-    \\{
-    \\"base_url":"https://your-custom-endpoint.com/v1/chat/completions",
-    \\"api_key":"你的密钥",
-    \\"model_name":"你的模型名称"
-    \\}
-    ,
-    .environment = "local",
+    .backend_kwargs = .{
+        .base_url = "https://your-custom-api.com/v1/chat/completions",
+        .api_key = "sk-...",
+        .model_name = "your-model",
+    },
+    .custom_system_prompt = "You are a specialized coding assistant...",
     .allocator = allocator,
 };
 ```
+</details>
 
 ### 使用自定义系统提示词
 
@@ -176,7 +180,11 @@ const custom_prompt = "你是一个专业的数学助手，专注于解决复杂
 
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = "你的配置",
+    .backend_kwargs = .{
+        .base_url = "https://api.openai.com/v1/chat/completions",
+        .api_key = "sk-你的密钥",
+        .model_name = "gpt-4",
+    },
     .custom_system_prompt = custom_prompt,
     .max_depth = 3,
     .allocator = allocator,
@@ -190,7 +198,11 @@ const logger = try RLMLogger.init("./logs", "my_session", allocator);
 
 var rlm: RLM = .{
     .backend = "openai",
-    .backend_kwargs = "你的配置",
+    .backend_kwargs = .{
+        .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        .api_key = "sk-你的密钥",
+        .model_name = "qwen-plus",
+    },
     .logger = logger,
     .max_depth = 2,
     .max_iterations = 30,
@@ -209,7 +221,7 @@ RLM 是框架的核心结构，负责管理语言模型的递归调用流程。
 **关键参数：**
 
 - `backend`: 后端服务标识符（如 "openai"）
-- `backend_kwargs`: JSON 格式的后端配置（API 密钥、基础 URL、模型名称）
+- `backend_kwargs`: 结构化后端配置（API 密钥、基础 URL、模型名称）
 - `environment`: 环境配置类型（如 "local"）
 - `max_depth`: 最大递归深度（默认：1）
 - `max_iterations`: 每个会话允许的最大迭代次数（默认：4）
@@ -249,62 +261,51 @@ var rlm: RLM = .{
 };
 ```
 
-## 📊 性能特点
-
-- **零成本抽象**: Zig 编译器优化，无运行时开销
-- **显式内存管理**: 精确控制内存分配和释放
-- **类型安全**: 编译时检查防止常见错误
-
 ## 🧪 测试
 
 运行测试套件：
 
 ```bash
-zig test rlm.zig
-zig test rlm_logger.zig
-zig test prompt.zig
-zig test parsing.zig
-zig test Model_info.zig
-zig test types.zig
+zig build test
 ```
 
 运行快速开始示例：
 
 ```bash
-zig test quickstart.zig
+zig build quickstart
 ```
 
 ## 🛠️ 项目结构
 
 ```
-rlm-zig/
-├── rlm.zig              # Core RLM orchestrator
-├── rlm_logger.zig       # Structured logging system
-├── types.zig            # Type definitions and structs
-├── prompt.zig           # Prompt construction utilities
-├── parsing.zig          # Response parsing (code blocks, answers)
-├── Model_info.zig       # Model configuration and metadata
-├── quickstart.zig       # Example usage and integration tests
-├── API_referance.md     # API reference documentation
-├── python_script/       # Python utility scripts
-│   ├── env_init.py      # Environment initialization script
-│   ├── find_code_blocks.py   # Python utility for code extraction
-│   └── find_final_answer.py  # Python utility for answer parsing
-├── logs/                # Generated log files (JSON format)
-├── zig-out/             # Build output directory
-│   └── bin/             # Compiled binaries
-├── .gitignore           # Git ignore rules
-└── README.md            # This file
+Omni-RLM/
+├── src/
+│   ├── omni-rlm.zig          # 对外导出 (RLM, RLMLogger)
+│   ├── core/
+│   │   ├── rlm.zig           # 核心 RLM 调度逻辑
+│   │   ├── rlm_logger.zig    # 结构化日志系统
+│   │   ├── types.zig         # 类型定义与结构体
+│   │   ├── prompt.zig        # 提示词构建工具
+│   │   ├── parsing.zig       # 响应解析 (代码块)
+│   │   ├── Model_info.zig    # 模型配置与请求
+│   │   └── environment/
+│   │       ├── type.zig      # EnvHandler 与环境类型
+│   │       ├── local.zig     # 本地 Python 运行器
+│   │       └── daytona.zig   # Daytona 运行器
+│   ├── example/
+│   │   ├── quickstart.zig    # 示例 (用于调试与测试)
+│   │   └── run.zig           # 示例运行器
+│   └── python_script/
+│       ├── env_init.py       # 环境初始化脚本
+│       ├── find_code_blocks.py
+│       └── find_final_answer.py
+├── API_referance.md     # API 参考文档
+├── build.zig
+├── build.zig.zon
+├── LICENSE
+└── README.md            # 英文文档
 ```
 
 ## 📖 详细文档
 
 - [API 参考](API_referance.md) - 完整的 API 文档
-- [快速开始示例](quickstart.zig) - 可运行的代码示例
-
-## ⚠️ 注意事项
-
-1. **API 密钥安全**: 请勿在代码中硬编码 API 密钥。使用环境变量或配置文件。
-2. **成本控制**: 设置合理的 `max_depth` 和 `max_iterations` 以控制 API 调用成本。
-3. **错误处理**: 始终使用 `try` 处理可能失败的操作。
-4. **内存管理**: 记得使用 `defer` 释放分配的内存。
