@@ -10,12 +10,12 @@ pub const backendKwargs = struct {
 
 pub const RLMMetadata = struct {
     root_model: []const u8,
-    max_depth: u32,
-    max_iterations: u32,
-    backend: []const u8,
+    max_depth: u32 = 1,
+    max_iterations: u32 = 10,
+    backend: []const u8 = "openai",
     backend_kwargs: backendKwargs,
     environment_type: ?[]const u8 = null,
-    environment_kwargs: ?[]const u8 = null,
+    environment_kwargs: []const u8 = "{}",
     other_backends: ?[]const u8 = null,
 };
 

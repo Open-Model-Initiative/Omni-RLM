@@ -125,6 +125,16 @@ pub const RLMLogger = struct {
         var entry: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, data_string, .{});
         defer entry.deinit();
 
+        // process environment_kwargs to be json object
+        var env_kwargs_entry: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(
+            std.json.Value,
+            allocator,
+            metadata.environment_kwargs,
+            .{},
+        );
+        defer env_kwargs_entry.deinit();
+        try entry.value.object.put("environment_kwargs", env_kwargs_entry.value);
+
         const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
         defer allocator.free(timestamp_str);
 
@@ -209,7 +219,7 @@ test "RLMLogger log_metadata" {
             .model_name = "qwen",
         },
         .environment_type = "local",
-        .environment_kwargs = "{}",
+        .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
         .other_backends = null,
     };
 
