@@ -9,6 +9,10 @@ pub fn main() !void {
         std.debug.print("Environment variable DASHSCOPE_API_KEY is not set.\n", .{});
         return error.MissingApiKey;
     };
+    // const api_key = std.process.getEnvVarOwned(allocator, "MOONSHOT_API_KEY") catch {
+    //     std.debug.print("Environment variable MOONSHOT_API_KEY is not set.\n", .{});
+    //     return error.MissingApiKey;
+    // };
     defer allocator.free(api_key);
 
     std.debug.print("\n*******RLM started*******\n", .{});
@@ -21,9 +25,11 @@ pub fn main() !void {
             // must provide full information of api_key, base_url, model_name in json format
             .backend_kwargs = .{
                 .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                // .api_key = "",
                 .api_key = api_key,
                 .model_name = "qwen-flash",
+                // .base_url = "https://api.moonshot.cn/v1/chat/completions",
+                // .api_key = api_key,
+                // .model_name = "moonshot-v1-8k",
             },
             .environment = "local",
             .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
