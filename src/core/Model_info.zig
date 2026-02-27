@@ -62,3 +62,12 @@ test "ModelHandler_make_request" {
     defer allocator.free(result);
     std.debug.print("\nModel response:\n{s}\n", .{result});
 }
+
+test "api key" {
+    const allocator = std.testing.allocator;
+    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
+        std.debug.print("\nEnvironment variable DASHSCOPE_API_KEY is not set.\n", .{});
+        return error.MissingApiKey;
+    };
+    defer allocator.free(api_key);
+}

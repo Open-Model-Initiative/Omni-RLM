@@ -22,13 +22,3 @@ test {
     _ = @import("core/environment/local.zig");
     _ = @import("core/environment/daytona.zig");
 }
-
-test "env" {
-    const std = @import("std");
-    const allocator = std.testing.allocator;
-    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
-        std.debug.print("\nEnvironment variable DASHSCOPE_API_KEY is not set.\n", .{});
-        return error.MissingApiKey;
-    };
-    defer allocator.free(api_key);
-}

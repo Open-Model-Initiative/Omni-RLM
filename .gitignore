@@ -2,3 +2,4 @@ zig-out/
 logs/
 .zig-cache/
 .DS_Store
+.vscode/

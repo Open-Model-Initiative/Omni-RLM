@@ -27,7 +27,7 @@ pub fn find_code_blocks(input: []const u8, allocator: std.mem.Allocator) !std.Ar
     return out_list;
 }
 
-test "test" {
+test "find_code_blocks" {
     var res = try find_code_blocks(
         \\```repl
         \\print("Hello, World!")

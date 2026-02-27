@@ -5,6 +5,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const test_filters = b.option([]const u8, "test-filter", "Comma-separated list of test filters to run");
+
     const omni_rlm = b.addModule("omni-rlm", .{
         .root_source_file = b.path("src/omni-rlm.zig"),
         .target = target,
@@ -43,6 +45,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "omni-rlm", .module = omni_rlm },
             },
         }),
+        .filters = &.{test_filters orelse ""},
     });
 
     const test_artifact = b.addRunArtifact(test_comp);
