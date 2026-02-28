@@ -49,7 +49,6 @@ Omni-RLM 是一个**高性能递归语言模型框架**，使 AI 代理能够通
 ### 前置要求
 
 - [Zig](https://ziglang.org/download/) 0.15.2 或更高版本
-- [mvzr](https://github.com/mnemnion/mvzr) 0.3.7+（正则表达式库，构建时通过 build.zig.zon 自动下载，无需手动安装）
 - Python 包 `dill`（仅在本地环境执行代码时需要）
 
 ### 安装步骤

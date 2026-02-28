@@ -1,40 +1,74 @@
 const std = @import("std");
-const RLMIteration = @import("types.zig").RLMIteration;
-const mvzr = @import("mvzr");
 
-pub fn find_code_blocks(input: []const u8, allocator: std.mem.Allocator) !std.ArrayList([]const u8) {
-    // const res = try std.process.Child.run(.{
-    //     .allocator = allocator,
-    //     .argv = &[_][]const u8{
-    //         "python",
-    //         "python_script/find_code_blocks.py",
-    //         input,
-    //     },
-    // });
-    // defer allocator.free(res.stdout);
-    // defer allocator.free(res.stderr);
-    // const rtext = try std.fmt.allocPrint(allocator, "{s}", .{res.stdout});
-    // return rtext;
-    var pat = mvzr.compile("```repl.*?```");
-    var out = pat.?.iterator(input);
-    var out_list: std.ArrayList([]const u8) = .empty;
-    while (out.next()) |m| {
-        var str = m.slice;
-        str = std.mem.trim(u8, str, "```repl");
-        str = std.mem.trim(u8, str, "```");
-        try out_list.append(allocator, str);
+const CodeToBeRun = struct {
+    label: []const u8,
+    code: []const u8,
+};
+
+pub fn find_code_blocks(
+    input: []const u8,
+    allocator: std.mem.Allocator,
+) !std.ArrayList(CodeToBeRun) {
+    var blocks = try std.ArrayList(CodeToBeRun).initCapacity(allocator, 0);
+
+    var inside_block = false;
+    var current_label: []const u8 = "";
+    var code_start: usize = 0;
+
+    var i: usize = 0;
+    while (i < input.len) {
+        const line_start = i;
+        while (i < input.len and input[i] != '\n') : (i += 1) {}
+        const line_end = i;
+
+        var trimmed_end = line_end;
+        if (trimmed_end > line_start and input[trimmed_end - 1] == '\r') {
+            trimmed_end -= 1;
+        }
+        const line = input[line_start..trimmed_end];
+
+        if (!inside_block) {
+            if (line.len >= 3 and std.mem.eql(u8, line[0..3], "```")) {
+                const rest = std.mem.trimLeft(u8, line[3..], " \t");
+                var token_end: usize = 0;
+                while (token_end < rest.len and rest[token_end] != ' ' and rest[token_end] != '\t') : (token_end += 1) {}
+
+                if (token_end > 0) {
+                    current_label = rest[0..token_end];
+                    inside_block = true;
+                    code_start = if (i < input.len and input[i] == '\n') i + 1 else i;
+                }
+            }
+        } else {
+            if (std.mem.eql(u8, line, "```")) {
+                try blocks.append(allocator, .{
+                    .label = current_label,
+                    .code = input[code_start..line_start],
+                });
+                inside_block = false;
+                current_label = "";
+            }
+        }
+
+        if (i < input.len and input[i] == '\n') {
+            i += 1;
+        }
     }
-    return out_list;
+
+    return blocks;
 }
 
+// TODO: - now only supports python code, should support bash code as well.
 test "find_code_blocks" {
     var res = try find_code_blocks(
-        \\```repl
+        \\```python
         \\print("Hello, World!")
         \\print("This is a test.")
         \\print("Goodbye!")
         \\```
-    , std.testing.allocator);
+    ,
+        std.testing.allocator,
+    );
     defer res.deinit(std.testing.allocator);
-    try std.testing.expectEqualStrings("\nprint(\"Hello, World!\")\nprint(\"This is a test.\")\nprint(\"Goodbye!\")\n", res.items[0]);
+    try std.testing.expectEqualStrings("print(\"Hello, World!\")\nprint(\"This is a test.\")\nprint(\"Goodbye!\")\n", res.items[0].code);
 }

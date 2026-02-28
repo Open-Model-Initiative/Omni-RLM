@@ -1,7 +1,6 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const mvzr = b.dependency("mvzr", .{});
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -11,9 +10,6 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/omni-rlm.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "mvzr", .module = mvzr.module("mvzr") },
-        },
     });
 
     const debug = b.addExecutable(.{
@@ -23,7 +19,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "mvzr", .module = mvzr.module("mvzr") },
                 .{ .name = "omni-rlm", .module = omni_rlm },
             },
         }),
@@ -41,7 +36,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "mvzr", .module = mvzr.module("mvzr") },
                 .{ .name = "omni-rlm", .module = omni_rlm },
             },
         }),
@@ -58,7 +52,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "mvzr", .module = mvzr.module("mvzr") },
                 .{ .name = "omni-rlm", .module = omni_rlm },
             },
         }),

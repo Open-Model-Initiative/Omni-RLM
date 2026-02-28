@@ -52,7 +52,6 @@ Omni-RLM is a **high-performance [recursive language model framework](https://gi
 ### Prerequisites
 
 - [Zig](https://ziglang.org/download/) 0.15.2 or later
-- [mvzr](https://github.com/mnemnion/mvzr) 0.3.7+ (regex library, auto-downloaded during build via build.zig.zon)
 - Python package `dill` for code execution in the 
 
 ### Installation Steps

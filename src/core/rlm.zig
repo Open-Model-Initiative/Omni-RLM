@@ -224,16 +224,17 @@ pub const RLM = struct {
     fn completion_turn(self: *RLM, prompt: []Message, lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();
-        const response = try lm_handler.make_request(prompt, allocator); //TODO find out what is the difference between @This() and *T
+        const response = try lm_handler.make_request(prompt, allocator);
+        // TODO: only support python code execution now, need to support bash code execution as well.
         var code_block_strs = try find_code_blocks(response, allocator);
         defer code_block_strs.deinit(allocator);
         var code_blocks: std.ArrayList(CodeBlock) = .empty;
         defer code_blocks.deinit(allocator);
 
         for (code_block_strs.items) |code_block_str| {
-            const code_result = try env.execute_code(code_block_str, allocator);
+            const code_result = try env.execute_code(code_block_str.code, allocator);
             try code_blocks.append(allocator, CodeBlock{
-                .code = try allocator.dupe(u8, code_block_str),
+                .code = try allocator.dupe(u8, code_block_str.code),
                 .result = code_result,
             });
         }
