@@ -297,7 +297,6 @@ Omni-RLM/
 │   │   └── run.zig           # 示例运行器
 │   └── python_script/
 │       ├── env_init.py       # 环境初始化脚本
-│       ├── find_code_blocks.py
 │       └── find_final_answer.py
 ├── API_referance.md     # API 参考文档
 ├── build.zig

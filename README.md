@@ -221,7 +221,6 @@ Omni-RLM/
 │   │   └── run.zig           # Example runner
 │   └── python_script/
 │       ├── env_init.py       # Environment initialization script
-│       ├── find_code_blocks.py
 │       └── find_final_answer.py
 ├── API_referance.md     # API reference documentation
 ├── build.zig

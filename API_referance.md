@@ -374,9 +374,20 @@ Safely deallocates a message array and all message content.
 
 ## Parsing Utilities
 
-### `find_code_blocks(input: []const u8, allocator: std.mem.Allocator) !std.ArrayList([]const u8)`
+### `CodeToBeRun` - Code Block Structure
 
-Extracts ```repl``` code blocks from response text.
+Represents an extracted code block with its language label and content.
+
+#### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `label` | `[]const u8` | The language tag of the code block (e.g., "python", "bash") |
+| `code` | `[]const u8` | The actual code content inside the block |
+
+### `find_code_blocks(input: []const u8, allocator: std.mem.Allocator) !std.ArrayList(CodeToBeRun)`
+
+Extracts fenced code blocks (```language ... ```) from response text.
 
 #### Example
 
@@ -384,13 +395,18 @@ Extracts ```repl``` code blocks from response text.
 var blocks = try find_code_blocks(response, allocator);
 defer blocks.deinit(allocator);
 for (blocks.items) |block| {
-  std.debug.print("Block:\n{s}\n", .{block});
+  std.debug.print("Language: {s}\n", .{block.label});
+  std.debug.print("Code:\n{s}\n", .{block.code});
 }
 ```
 
 #### Notes
 
-- Returned slices reference the original `input` buffer.
+- Returns an `ArrayList` of `CodeToBeRun` structs, each containing the language label and code content
+- The `label` field contains the language tag specified after the opening backticks (e.g., "python" from ```python)
+- Both `label` and `code` slices reference the original `input` buffer
+- Handles both Windows (\r\n) and Unix (\n) line endings
+- Empty code blocks (consecutive closing backticks) are not included in results
 
 ---
 
