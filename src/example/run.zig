@@ -32,7 +32,7 @@ pub fn main() !void {
                 // .model_name = "moonshot-v1-8k",
             },
             .environment = "local",
-            .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
+            .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,

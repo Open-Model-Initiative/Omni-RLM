@@ -1,6 +1,6 @@
 const std = @import("std");
-pub const local = @import("local.zig").LocalEnv;
-pub const daytona = @import("daytona.zig").DaytonaEnv;
+pub const local = @import("local/local.zig").LocalEnv;
+pub const daytona = @import("daytona/daytona.zig").DaytonaEnv;
 
 pub const env_type = enum {
     local,
@@ -64,7 +64,7 @@ test "EnvHandler local execute_code" {
 
     //// Test with local environment
     const environment = "local";
-    const kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}";
+    const kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}";
 
     var env: EnvHandler = undefined;
     const Test_env_type = std.meta.stringToEnum(env_type, environment) orelse env_type.local;

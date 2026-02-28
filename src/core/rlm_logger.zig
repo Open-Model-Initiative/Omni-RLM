@@ -220,7 +220,7 @@ test "RLMLogger log_metadata" {
             .model_name = "qwen",
         },
         .environment_type = "local",
-        .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
+        .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
         .other_backends = null,
     };
 

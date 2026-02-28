@@ -94,7 +94,7 @@ pub fn main() !void {
             .model_name = "qwen-plus",
         },
         .environment = "local",
-        .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
+        .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
@@ -290,14 +290,16 @@ Omni-RLM/
 │   │   ├── Model_info.zig    # 模型配置与请求
 │   │   └── environment/
 │   │       ├── type.zig      # EnvHandler 与环境类型
-│   │       ├── local.zig     # 本地 Python 运行器
-│   │       └── daytona.zig   # Daytona 运行器
-│   ├── example/
-│   │   ├── quickstart.zig    # 示例 (用于调试与测试)
-│   │   └── run.zig           # 示例运行器
-│   └── python_script/
-│       ├── env_init.py       # 环境初始化脚本
-│       └── find_final_answer.py
+│   │       ├── local/        # 本地 Python 环境
+│   │       │   ├── local.zig # 本地运行器实现
+│   │       │   ├── env_init.py       # 环境初始化脚本
+│   │       │   └── find_final_answer.py
+│   │       └── daytona/      # Daytona 环境
+│   │           └── daytona.zig       # Daytona 运行器
+│   │           └── daytona_script.py # Daytona 辅助脚本
+│   └── example/
+│       ├── quickstart.zig    # 示例 (用于调试与测试)
+│       └── run.zig           # 示例运行器
 ├── API_referance.md     # API 参考文档
 ├── build.zig
 ├── build.zig.zon

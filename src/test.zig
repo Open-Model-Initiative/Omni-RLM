@@ -6,8 +6,8 @@ const file_list = [_][]const u8{
     "core/rlm.zig",
     "core/types.zig",
     "core/environment/type.zig",
-    "core/environment/local.zig",
-    "core/environment/daytona.zig",
+    "core/environment/local/local.zig",
+    "core/environment/daytona/daytona.zig",
 };
 test {
     const std = @import("std");
@@ -19,6 +19,6 @@ test {
     _ = @import("core/rlm.zig");
     _ = @import("core/types.zig");
     _ = @import("core/environment/type.zig");
-    _ = @import("core/environment/local.zig");
-    _ = @import("core/environment/daytona.zig");
+    _ = @import("core/environment/local/local.zig");
+    _ = @import("core/environment/daytona/daytona.zig");
 }

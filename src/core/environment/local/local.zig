@@ -26,7 +26,7 @@ pub const LocalEnv = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "src/python_script/find_final_answer.py",
+                "src/core/environment/local/find_final_answer.py",
                 text,
             },
         });
@@ -42,8 +42,8 @@ pub const LocalEnv = struct {
 
 test "read json kwargs in LocalEnv" {
     const allocator = std.testing.allocator;
-    const kwags = "{\"mainfunc\": \"src/python_script/env_init.py\"}";
+    const kwags = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}";
     const parsed: std.json.Parsed(LocalEnv) = try std.json.parseFromSlice(LocalEnv, allocator, kwags, .{});
     defer parsed.deinit();
-    try std.testing.expectEqualStrings("src/python_script/env_init.py", parsed.value.mainfunc);
+    try std.testing.expectEqualStrings("src/core/environment/local/env_init.py", parsed.value.mainfunc);
 }

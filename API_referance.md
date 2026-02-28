@@ -219,7 +219,7 @@ Shuts down the environment and releases resources.
 ```zig
 var env: EnvHandler = undefined;
 const etype = std.meta.stringToEnum(env_type, "local") orelse env_type.local;
-try env.init(etype, "{\"mainfunc\": \"src/python_script/env_init.py\"}", "", allocator);
+try env.init(etype, "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}", "", allocator);
 const result = try env.execute_code("print('hello')", allocator);
 defer {
   allocator.free(result.stdout);
@@ -240,7 +240,7 @@ try env.deinit(allocator);
 #### Notes
 
 - Expects `mainfunc` to accept `(code, context)` arguments.
-- Uses `src/python_script/env_init.py` in examples/tests.
+- Uses `src/core/environment/local/env_init.py` in examples/tests.
 
 ### `DaytonaEnv` - Remote Daytona Runner
 

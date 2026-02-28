@@ -22,7 +22,7 @@ test "quickstart run" {
                 .model_name = "qwen-plus",
             },
             .environment = "local",
-            .environment_kwargs = "{\"mainfunc\": \"src/python_script/env_init.py\"}",
+            .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,
