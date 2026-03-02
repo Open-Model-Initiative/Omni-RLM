@@ -110,11 +110,11 @@ pub fn buildUserPrompt(
 
     if (iteration == 0) {
         const safeguard = "You have not interacted with the REPL environment or seen your prompt / context yet. Your next action should be to look through and figure out how to answer the prompt, so don't just provide a final answer yet.\n\n";
-        if (root_prompt != null) {
+        if (root_prompt) |rp| {
             const plug_in_root_prompt = try std.fmt.allocPrint(
                 allocator,
                 USER_PROMPT_WITH_ROOT,
-                .{root_prompt.?},
+                .{rp},
             );
             defer allocator.free(plug_in_root_prompt);
             prompt = try std.fmt.allocPrint(
@@ -250,19 +250,11 @@ pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: Quer
         },
     );
     var system_content: []u8 = undefined;
-    if (custom_system_prompt != null) {
-        system_content = try std.fmt.allocPrint(
-            allocator,
-            "{s}",
-            .{custom_system_prompt.?},
-        );
-    } else {
-        system_content = try std.fmt.allocPrint(
-            allocator,
-            "{s}",
-            .{RLM_SYSTEM_PROMPT},
-        );
-    }
+    system_content = try std.fmt.allocPrint(
+        allocator,
+        "{s}",
+        .{custom_system_prompt orelse RLM_SYSTEM_PROMPT},
+    );
 
     const Msg = [2]Message{
         Message{ .role = "system", .content = system_content },

@@ -140,7 +140,9 @@ pub const RLMLogger = struct {
 
         try entry.value.object.put("type", std.json.Value{ .string = "metadata" });
         try entry.value.object.put("timestamp", std.json.Value{ .string = timestamp_str });
-        _ = entry.value.object.getPtr("backend_kwargs").?.object.swapRemove("api_key");
+        if (entry.value.object.getPtr("backend_kwargs")) |backend_kwargs| {
+            _ = backend_kwargs.object.swapRemove("api_key");
+        }
 
         const json_metadata = std.json.fmt(entry.value, .{});
         const str = try std.fmt.allocPrint(allocator, "{f}", .{json_metadata});

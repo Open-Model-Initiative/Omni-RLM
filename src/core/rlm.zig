@@ -29,7 +29,7 @@ pub const RLM = struct {
 
     pub fn init(self: *RLM) !void {
         // Initialization logic if needed
-        if (self.logger != null) {
+        if (self.logger) |*logger| {
             const metadata: RLMMetadata = .{
                 .root_model = self.backend_kwargs.model_name,
                 .max_depth = self.max_depth,
@@ -40,7 +40,7 @@ pub const RLM = struct {
                 .environment_kwargs = self.environment_kwargs,
                 .other_backends = self.other_backends,
             };
-            try self.logger.?.log_metadata(metadata, self.allocator);
+            try logger.log_metadata(metadata, self.allocator);
         }
 
         // Clean up previous session file if exists
@@ -48,8 +48,8 @@ pub const RLM = struct {
     }
 
     pub fn deinit(self: *RLM) void {
-        if (self.logger != null) {
-            self.logger.?.deinit(self.allocator);
+        if (self.logger) |*logger| {
+            logger.deinit(self.allocator);
         }
         self.* = undefined;
     }
@@ -191,21 +191,19 @@ pub const RLM = struct {
             std.debug.print("===============================\n\n", .{});
 
             const final_answer = try env.find_final_answer(iteration.response, allocator);
-            if (final_answer != null) {
-                iteration.final_answer = final_answer;
+            iteration.final_answer = final_answer;
+
+            if (self.logger) |*logger| {
+                try logger.log_iteration(iteration, allocator);
             }
 
-            if (self.logger != null) {
-                try self.logger.?.log_iteration(iteration, allocator);
-            }
-
-            if (iteration.final_answer != null) {
-                std.debug.print("\nFinal answer found: \n{s}\n", .{iteration.final_answer.?});
+            if (iteration.final_answer) |ans| {
+                std.debug.print("\nFinal answer found: \n{s}\n", .{ans});
                 const timeend = std.time.milliTimestamp();
                 return RLMChatCompletion{
                     .root_model = lm_handler.model_name,
                     .prompt = prompt,
-                    .response = iteration.final_answer.?,
+                    .response = ans,
                     .execution_time = timeend - timestart,
                 };
             }
