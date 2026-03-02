@@ -12,6 +12,44 @@ const find_code_blocks = @import("parsing.zig").find_code_blocks;
 const environment = @import("environment/type.zig");
 const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 
+/// RLM (Recursive Language Model) orchestrator for managing recursive LLM completions
+///
+/// The RLM struct manages the recursive completion loop, allowing LLMs to:
+/// - Execute code in a controlled environment (local Python or Daytona sandbox)
+/// - Make recursive LLM calls via the `llm_query` function
+/// - Iterate until a final answer is found or limits are reached
+///
+/// ## Fields
+/// - `backend`: Backend type (default: "openai")
+/// - `backend_kwargs`: API configuration including api_key, base_url, model_name
+/// - `environment`: Execution environment type - "local" or "daytona" (default: "local")
+/// - `environment_kwargs`: JSON string with environment-specific configuration
+/// - `depth`: Current recursion depth (automatically managed)
+/// - `max_depth`: Maximum recursion depth (default: 1)
+/// - `max_iterations`: Maximum iterations per completion (default: 4)
+/// - `custom_system_prompt`: Optional custom system prompt to override default
+/// - `other_backends`: Optional other backend configurations
+/// - `other_backend_kwargs`: Optional other backend kwargs
+/// - `logger`: Optional RLMLogger for structured logging
+/// - `allocator`: Memory allocator for all allocations
+///
+/// ## Example
+/// ```zig
+/// var rlm: RLM = .{
+///     .backend_kwargs = .{
+///         .api_key = api_key,
+///         .base_url = "https://api.example.com/v1/chat/completions",
+///         .model_name = "gpt-4",
+///     },
+///     .environment = "local",
+///     .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
+///     .max_depth = 2,
+///     .max_iterations = 10,
+///     .allocator = allocator,
+/// };
+/// try rlm.init();
+/// defer rlm.deinit();
+/// ```
 pub const RLM = struct {
     backend: []const u8 = "openai",
     /// Please provide full information of api_key, base_url, model_name in json format
@@ -27,6 +65,13 @@ pub const RLM = struct {
     logger: ?RLMLogger = null,
     allocator: std.mem.Allocator,
 
+    /// Initialize the RLM instance
+    ///
+    /// Logs metadata if a logger is configured and cleans up previous session files.
+    /// This should be called before using the RLM instance.
+    ///
+    /// ## Errors
+    /// Returns error if metadata logging fails
     pub fn init(self: *RLM) !void {
         // Initialization logic if needed
         if (self.logger) |*logger| {
@@ -47,6 +92,10 @@ pub const RLM = struct {
         std.fs.cwd().deleteFile("env.dill") catch {};
     }
 
+    /// Deinitialize the RLM instance
+    ///
+    /// Frees resources associated with the RLM including the logger if present.
+    /// This should be called when done using the RLM instance.
     pub fn deinit(self: *RLM) void {
         if (self.logger) |*logger| {
             logger.deinit(self.allocator);
@@ -54,6 +103,7 @@ pub const RLM = struct {
         self.* = undefined;
     }
 
+    /// Set up the system prompt for the completion
     fn setup_prompt(self: *RLM, prompt: []u8, allocator: std.mem.Allocator) ![]Message {
         // Implementation for setting up the prompt
         var metadata: QueryMetadata = QueryMetadata.init(prompt, allocator);
@@ -63,6 +113,9 @@ pub const RLM = struct {
         return message_history;
     }
 
+    /// Fallback answer when max depth is reached
+    ///
+    /// Makes a simple direct request to the model without the REPL system prompt.
     fn fallback_answer(self: *RLM, prompt: []u8, lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
         // Simple single iteration: ask and get final answer without system prompt setup
         _ = self;
@@ -89,6 +142,7 @@ pub const RLM = struct {
         };
     }
 
+    /// Default answer when max iterations reached without finding a final answer
     fn default_answer(self: *RLM, prompt: []u8, message_history: []Message, lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
         _ = self;
         // Generate a final answer when max iterations reached without finding a final answer
@@ -128,6 +182,30 @@ pub const RLM = struct {
         };
     }
 
+    /// Execute a recursive completion
+    ///
+    /// This is the main entry point for RLM completions. It:
+    /// 1. Sets up the execution environment
+    /// 2. Iteratively prompts the model
+    /// 3. Executes code blocks from responses
+    /// 4. Continues until a final answer is found or limits are reached
+    ///
+    /// ## Parameters
+    /// - `prompt`: The user query/prompt
+    /// - `root_prompt`: Optional original prompt for recursive calls
+    ///
+    /// ## Returns
+    /// `RLMChatCompletion` containing the final response and metadata
+    ///
+    /// ## Errors
+    /// Returns errors if API requests fail, environment setup fails, or memory allocation fails
+    ///
+    /// ## Example
+    /// ```zig
+    /// const result = try rlm.completion("What is 2+2?", null);
+    /// defer allocator.free(result.response);
+    /// std.debug.print("Answer: {s}\n", .{result.response});
+    /// ```
     pub fn completion(self: *RLM, prompt: []u8, root_prompt: ?[]u8) !RLMChatCompletion {
         // Implementation for completion logic goes here
         const allocator = self.allocator;
@@ -219,6 +297,7 @@ pub const RLM = struct {
         return try self.default_answer(prompt, message_history, lm_handler, allocator);
     }
 
+    /// Execute a single completion turn (one model request + code execution)
     fn completion_turn(self: *RLM, prompt: []Message, lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();

@@ -2,6 +2,14 @@ const std = @import("std");
 const Metadata = @import("types.zig").RLMMetadata;
 const RLMIteration = @import("types.zig").RLMIteration;
 
+/// Format a timestamp as ISO 8601 format with microseconds
+///
+/// ## Parameters
+/// - `allocator`: Memory allocator for the result string
+/// - `seconds`: Unix timestamp in seconds
+///
+/// ## Returns
+/// Formatted timestamp string (e.g., "2024-01-15T10:30:45.123456")
 fn formatTimestampUtc(allocator: std.mem.Allocator, seconds: i64) ![]const u8 {
     const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(seconds + 60 * 60 * 8) };
     const epoch_day = epoch_seconds.getEpochDay();
@@ -26,6 +34,14 @@ test "time" {
     std.debug.print("\nCurrent UTC time: {s}\n", .{timestamp_str});
 }
 
+/// Format a timestamp for use in filenames
+///
+/// ## Parameters
+/// - `allocator`: Memory allocator for the result string
+/// - `seconds`: Unix timestamp in seconds
+///
+/// ## Returns
+/// Filename-safe timestamp string (e.g., "20240115_10-30-45")
 fn formatTimestampUtcForFilename(allocator: std.mem.Allocator, seconds: i64) ![]const u8 {
     const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(seconds + 60 * 60 * 8) };
     const epoch_day = epoch_seconds.getEpochDay();
@@ -43,9 +59,28 @@ fn formatTimestampUtcForFilename(allocator: std.mem.Allocator, seconds: i64) ![]
     });
 }
 
-///Logger for RLM iterations.
+/// Logger for RLM iterations
 ///
-///Writes RLMIteration data to JSON-lines files for analysis and debugging.
+/// Writes RLM iteration data and metadata to JSON-lines files for analysis and debugging.
+/// Each log entry is written as a separate JSON line with timestamp and type information.
+///
+/// ## Fields
+/// - `log_dir`: Directory path for log files
+/// - `log_file_path`: Full path to the current log file
+/// - `iteration_count`: Number of iterations logged so far
+/// - `metadata_logged`: Whether metadata has been written
+///
+/// ## Example
+/// ```zig
+/// var logger = try RLMLogger.init("./logs", "my_run", allocator);
+/// defer logger.deinit(allocator);
+///
+/// // Log session metadata
+/// try logger.log_metadata(metadata, allocator);
+///
+/// // Log each iteration
+/// try logger.log_iteration(iteration_data, allocator);
+/// ```
 pub const RLMLogger = struct {
     // Placeholder for logger fields
     log_dir: []const u8,
@@ -53,6 +88,21 @@ pub const RLMLogger = struct {
     iteration_count: u32,
     metadata_logged: bool,
 
+    /// Initialize a new RLMLogger
+    ///
+    /// Creates the log directory if it doesn't exist and generates a unique
+    /// log filename with timestamp and random ID.
+    ///
+    /// ## Parameters
+    /// - `log_dir`: Directory path for log files (created if needed)
+    /// - `file_name`: Base name for the log file
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Returns
+    /// Initialized RLMLogger ready for logging
+    ///
+    /// ## Errors
+    /// Returns error if directory creation or path allocation fails
     pub fn init(
         log_dir: []const u8,
         file_name: []const u8,
@@ -90,11 +140,28 @@ pub const RLMLogger = struct {
         };
     }
 
+    /// Deinitialize the logger
+    ///
+    /// Frees the log file path memory.
+    ///
+    /// ## Parameters
+    /// - `allocator`: Memory allocator used for allocations
     pub fn deinit(self: *RLMLogger, allocator: std.mem.Allocator) void {
         allocator.free(self.log_file_path);
         self.* = undefined;
     }
 
+    /// Log a single RLM iteration
+    ///
+    /// Writes iteration data to the log file as a JSON line with
+    /// timestamp, iteration number, and type marker.
+    ///
+    /// ## Parameters
+    /// - `iteration_data`: The RLMIteration to log
+    /// - `allocator`: Memory allocator for temporary allocations
+    ///
+    /// ## Errors
+    /// Returns error if JSON serialization or file write fails
     pub fn log_iteration(self: *RLMLogger, iteration_data: RLMIteration, allocator: std.mem.Allocator) !void {
         self.iteration_count += 1;
         const data_string = try std.json.Stringify.valueAlloc(allocator, iteration_data, .{});
@@ -116,6 +183,18 @@ pub const RLMLogger = struct {
         try self.log(str);
     }
 
+    /// Log session metadata
+    ///
+    /// Writes RLM configuration metadata to the log file.
+    /// The API key is automatically stripped from the logged output for security.
+    /// Only logs metadata once per session.
+    ///
+    /// ## Parameters
+    /// - `metadata`: The RLMMetadata to log
+    /// - `allocator`: Memory allocator for temporary allocations
+    ///
+    /// ## Errors
+    /// Returns error if JSON serialization or file write fails
     pub fn log_metadata(self: *RLMLogger, metadata: Metadata, allocator: std.mem.Allocator) !void {
         if (self.metadata_logged) return;
 
@@ -152,6 +231,16 @@ pub const RLMLogger = struct {
         self.metadata_logged = true;
     }
 
+    /// Write a line to the log file
+    ///
+    /// Internal method to append data to the log file.
+    /// Creates the file if it doesn't exist, otherwise appends.
+    ///
+    /// ## Parameters
+    /// - `data`: String to write to the log
+    ///
+    /// ## Errors
+    /// Returns error if file operations fail
     fn log(self: *RLMLogger, data: []const u8) !void {
         var file: std.fs.File = undefined;
         file = std.fs.cwd().createFile(self.log_file_path, .{

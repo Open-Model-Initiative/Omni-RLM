@@ -3,12 +3,48 @@ const Client = std.http.Client;
 const Request = Client.Request;
 const Message = @import("types.zig").Message;
 
+/// Handler for LLM API requests
+///
+/// Manages HTTP communication with OpenAI-compatible API endpoints.
+/// Currently supports standard chat completions endpoints.
+///
+/// ## Fields
+/// - `base_url`: Full URL for the chat completions endpoint
+/// - `api_key`: API key for authentication
+/// - `model_name`: Name of the model to use
+///
+/// ## Example
+/// ```zig
+/// const handler = ModelHandler{
+///     .base_url = "https://api.openai.com/v1/chat/completions",
+///     .api_key = "sk-...",
+///     .model_name = "gpt-4",
+/// };
+/// const response = try handler.make_request(messages, allocator);
+/// ```
 // TODO only support openai backend for now, we will add more backend support in the future
 pub const ModelHandler = struct {
     base_url: []const u8 = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
     api_key: []const u8 = "",
     model_name: []const u8 = "qwen-plus",
 
+    /// Make an API request to the LLM endpoint
+    ///
+    /// Sends a chat completion request with the provided messages and returns
+    /// the model's response text.
+    ///
+    /// ## Parameters
+    /// - `messages`: Array of Message structs representing the conversation
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Returns
+    /// The response content string (caller owns memory)
+    ///
+    /// ## Errors
+    /// Returns error if:
+    /// - HTTP request fails
+    /// - Response parsing fails
+    /// - Expected fields are missing from response
     pub fn make_request(self: @This(), messages: []Message, allocator: std.mem.Allocator) ![]u8 {
         const endpoint = try std.Uri.parse(self.base_url);
         var client: Client = .{ .allocator = allocator };

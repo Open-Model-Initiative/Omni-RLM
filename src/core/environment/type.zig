@@ -2,15 +2,43 @@ const std = @import("std");
 pub const local = @import("local/local.zig").LocalEnv;
 pub const daytona = @import("daytona/daytona.zig").DaytonaEnv;
 
+/// Environment type enumeration
+///
+/// Defines the available execution environments for code execution.
 pub const env_type = enum {
+    /// Local Python environment using subprocess execution
     local,
+    /// Daytona sandbox environment for isolated execution
     daytona,
 };
 
+/// Union type for environment handlers
+///
+/// Provides a unified interface for different execution environments.
+/// Use this type to work with any supported environment uniformly.
+///
+/// ## Example
+/// ```zig
+/// var env: EnvHandler = undefined;
+/// try env.init(env_type.local, kwargs, prompt, allocator);
+/// defer env.deinit(allocator) catch {};
+///
+/// const result = try env.execute_code("print('hello')", allocator);
+/// ```
 pub const EnvHandler = union(env_type) {
     local: local,
     daytona: daytona,
 
+    /// Initialize the environment handler
+    ///
+    /// ## Parameters
+    /// - `etype`: The environment type to initialize
+    /// - `kwargs`: JSON string with environment-specific configuration
+    /// - `prompt`: The user prompt/context for the session
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Errors
+    /// Returns error if initialization fails or configuration is invalid
     pub fn init(self: *EnvHandler, etype: env_type, kwargs: []const u8, prompt: []const u8, allocator: std.mem.Allocator) !void {
         switch (etype) {
             .local => {
@@ -26,6 +54,17 @@ pub const EnvHandler = union(env_type) {
         }
     }
 
+    /// Execute code in the environment
+    ///
+    /// ## Parameters
+    /// - `code`: The source code to execute
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Returns
+    /// Process execution result containing stdout, stderr, and exit status
+    ///
+    /// ## Errors
+    /// Returns error if code execution fails
     pub fn execute_code(self: *const EnvHandler, code: []const u8, allocator: std.mem.Allocator) !std.process.Child.RunResult {
         switch (self.*) {
             .local => {
@@ -37,6 +76,15 @@ pub const EnvHandler = union(env_type) {
         }
     }
 
+    /// Deinitialize the environment
+    ///
+    /// Frees resources associated with the environment.
+    ///
+    /// ## Parameters
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Errors
+    /// Returns error if cleanup fails
     pub fn deinit(self: *EnvHandler, allocator: std.mem.Allocator) !void {
         switch (self.*) {
             .local => {
@@ -47,6 +95,20 @@ pub const EnvHandler = union(env_type) {
             },
         }
     }
+
+    /// Find the final answer in a response
+    ///
+    /// Parses the model response to extract FINAL() or FINAL_VAR() markers.
+    ///
+    /// ## Parameters
+    /// - `response`: The model response text to parse
+    /// - `allocator`: Memory allocator for allocations
+    ///
+    /// ## Returns
+    /// The extracted final answer, or null if not found
+    ///
+    /// ## Errors
+    /// Returns error if parsing fails
     pub fn find_final_answer(self: *const EnvHandler, response: []const u8, allocator: std.mem.Allocator) !?[]const u8 {
         switch (self.*) {
             .local => {

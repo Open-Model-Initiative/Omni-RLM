@@ -1,10 +1,33 @@
 const std = @import("std");
 
+/// Internal struct representing a code block to be executed
 const CodeToBeRun = struct {
     label: []const u8,
     code: []const u8,
 };
 
+/// Find and extract code blocks from text
+///
+/// Parses markdown-style code blocks (```language\ncode\n```) from the input text.
+/// Currently only supports Python code blocks with "repl" or "python" labels.
+///
+/// ## Parameters
+/// - `input`: The text to search for code blocks
+/// - `allocator`: Memory allocator for the result list
+///
+/// ## Returns
+/// ArrayList of CodeToBeRun structs containing the language label and code content
+///
+/// ## Example
+/// ```zig
+/// const blocks = try find_code_blocks(
+///     \\`
+///     \\python
+///     \\print("Hello")
+///     \\`
+/// , allocator);
+/// defer blocks.deinit(allocator);
+/// ```
 pub fn find_code_blocks(
     input: []const u8,
     allocator: std.mem.Allocator,

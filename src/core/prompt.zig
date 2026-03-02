@@ -4,6 +4,13 @@ const QueryMetadata = @import("types.zig").QueryMetadata;
 const Message = @import("types.zig").Message;
 
 /// System prompt for the REPL environment with explicit final answer checking
+///
+/// This is the default system prompt that guides the LLM in using the REPL environment
+/// for recursive problem-solving. It instructs the model on:
+/// - Accessing and analyzing context data
+/// - Using the `llm_query` and `llm_query_batched` functions
+/// - Chunking strategies for large contexts
+/// - Providing final answers with FINAL() or FINAL_VAR()
 pub const RLM_SYSTEM_PROMPT: []const u8 =
     \\You are tasked with answering a query with associated context. You can access, transform, and analyze this context interactively in a REPL environment that can recursively query sub-LLMs, which you are strongly encouraged to use as much as possible. You will be queried iteratively until you provide a final answer.
     \\
@@ -80,12 +87,19 @@ pub const RLM_SYSTEM_PROMPT: []const u8 =
     \\Think step by step carefully, plan, and execute this plan immediately in your response -- do not just say "I will do this" or "I will do that". Output to the REPL environment and recursive LLMs as much as possible. Remember to explicitly answer the original query in your final answer.
 ;
 
+/// Default user prompt template
+///
+/// Basic user prompt for guiding the model's next action in the REPL environment
 pub const USER_PROMPT: []const u8 =
     \\Think step-by-step on what to do using the REPL environment (which contains the context) to answer the prompt.
     \\
     \\Continue using the REPL environment, which has the `context` variable, and querying sub-LLMs by writing to ```repl``` tags, and determine your answer. Your next action:
 ;
 
+/// User prompt template with root prompt reference
+///
+/// Extended user prompt that includes the original/root prompt for context.
+/// Uses printf-style formatting with `{s}` placeholder for the root prompt.
 pub const USER_PROMPT_WITH_ROOT: []const u8 =
     \\Think step-by-step on what to do using the REPL environment (which contains the context) to answer the original prompt: {s}.
     \\
@@ -93,6 +107,29 @@ pub const USER_PROMPT_WITH_ROOT: []const u8 =
 ;
 
 /// Build user prompt based on root_prompt and iteration number
+///
+/// Generates appropriate user prompt messages based on the iteration number
+/// and whether this is the initial prompt or a follow-up.
+///
+/// ## Parameters
+/// - `input_parameters`: Struct containing:
+///   - `root_prompt`: Optional original/root prompt for context
+///   - `iteration`: Current iteration number (0-indexed)
+///   - `context_count`: Number of context segments available (default: 1)
+///   - `history_count`: Number of prior conversation histories (default: 0)
+/// - `allocator`: Memory allocator for allocations
+///
+/// ## Returns
+/// Array of Message structs containing the user prompt
+///
+/// ## Example
+/// ```zig
+/// const messages = try buildUserPrompt(.{
+///     .root_prompt = "What is the capital of France?",
+///     .iteration = 0,
+/// }, allocator);
+/// defer ReleaseMessageArray(messages, allocator);
+/// ```
 pub fn buildUserPrompt(
     input_parameters: struct {
         root_prompt: ?[]const u8 = null,
@@ -217,7 +254,28 @@ test "buildUserPrompt works" {
     }
 }
 
-///you need to release the `system_prompt` and `system_prompt[1].content` after use
+/// Build the system prompt for RLM initialization
+///
+/// Creates the initial system messages including the system prompt and
+/// context metadata information.
+///
+/// ## Parameters
+/// - `custom_system_prompt`: Optional custom system prompt to override default
+/// - `query_metadata`: Metadata about the query context
+/// - `allocator`: Memory allocator for allocations
+///
+/// ## Returns
+/// Array of 2 Message structs (system prompt and context info)
+///
+/// ## Memory Management
+/// The caller must release both the returned array AND `result[1].content`
+/// using `ReleaseMessageArray`.
+///
+/// ## Example
+/// ```zig
+/// const system_msgs = try buildSystemPrompt(null, metadata, allocator);
+/// defer ReleaseMessageArray(system_msgs, allocator);
+/// ```
 pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) ![]Message {
     const context_lengths = query_metadata.context_length;
     const context_total_length = query_metadata.context_total_length;
@@ -278,6 +336,20 @@ test "buildSystemPrompt works" {
     std.debug.print("\nTESTING:System Prompt\n{f}\n", .{formatter});
 }
 
+/// Release memory for a message array
+///
+/// Frees all content strings and the message array itself.
+/// Must be used to clean up arrays returned by buildUserPrompt and buildSystemPrompt.
+///
+/// ## Parameters
+/// - `messages`: The message array to release
+/// - `allocator`: Memory allocator used for allocations
+///
+/// ## Example
+/// ```zig
+/// const messages = try buildUserPrompt(..., allocator);
+/// defer ReleaseMessageArray(messages, allocator);
+/// ```
 pub fn ReleaseMessageArray(messages: []Message, allocator: std.mem.Allocator) void {
     for (messages) |msg| {
         allocator.free(msg.content);
