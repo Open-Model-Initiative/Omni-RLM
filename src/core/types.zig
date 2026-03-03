@@ -111,7 +111,7 @@ pub const QueryMetadata = struct {
 /// };
 /// ```
 pub const RLMIteration = struct {
-    prompt: []Message,
+    prompt: std.ArrayList(Message),
     ///repl like response from LM
     response: []const u8,
     code_blocks: []CodeBlock,
@@ -127,13 +127,13 @@ pub const RLMIteration = struct {
     /// - `allocator`: Memory allocator for allocations
     ///
     /// ## Returns
-    /// Array of Message structs representing this iteration
-    pub fn format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) ![]Message {
-        var Messages = try allocator.alloc(Message, self.code_blocks.len + 1);
-        Messages[0] = Message{
+    /// ArrayList of Message structs representing this iteration
+    pub fn format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) !std.ArrayList(Message) {
+        var messages: std.ArrayList(Message) = .empty;
+        try messages.append(allocator, Message{
             .role = "assistant",
             .content = try allocator.dupe(u8, self.response),
-        };
+        });
         for (0..self.code_blocks.len) |index| {
             const code = self.code_blocks[index].code;
             const result = try std.fmt.allocPrint(
@@ -142,12 +142,12 @@ pub const RLMIteration = struct {
                 .{ self.code_blocks[index].result.stdout, self.code_blocks[index].result.stderr },
             );
             defer allocator.free(result);
-            Messages[index + 1] = Message{
+            try messages.append(allocator, Message{
                 .role = "user",
                 .content = try std.fmt.allocPrint(allocator, "Code executed:\n```python\n{s}\n```\nREPL output::\n{s}", .{ code, result }),
-            };
+            });
         }
-        return Messages;
+        return messages;
     }
 };
 

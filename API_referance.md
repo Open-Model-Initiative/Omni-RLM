@@ -150,7 +150,7 @@ Represents a single iteration in the RLM execution loop, including prompt, respo
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `prompt` | `[]Message` | Array of messages forming the conversation prompt |
+| `prompt` | `std.ArrayList(Message)` | ArrayList of messages forming the conversation prompt |
 | `response` | `[]const u8` | REPL-like response from the language model |
 | `code_blocks` | `[]CodeBlock` | Extracted and executed code blocks from response |
 | `final_answer` | `?[]const u8` | Optional final answer extracted from response |
@@ -158,11 +158,11 @@ Represents a single iteration in the RLM execution loop, including prompt, respo
 
 #### Methods
 
-##### `format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) ![]Message`
+##### `format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) !std.ArrayList(Message)`
 
-Formats the iteration into a message array for the next iteration. Each code block adds a user message containing the executed code and its stdout/stderr.
+Formats the iteration into a message ArrayList for the next iteration. Each code block adds a user message containing the executed code and its stdout/stderr.
 
-**Returns:** Array of messages containing assistant response and system feedback
+**Returns:** ArrayList of messages containing assistant response and system feedback
 
 #### Notes
 
@@ -340,17 +340,18 @@ Generates a completion based on input text.
 - `USER_PROMPT`
 - `USER_PROMPT_WITH_ROOT`
 
-### `buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) ![]Message`
+### `buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) !std.ArrayList(Message)`
 
 Constructs the system prompt and context description for the RLM session.
 
-**Returns:** Array of 2 messages (system prompt + assistant info)
+**Returns:** ArrayList of 2 messages (system prompt + assistant info)
 
 **Notes:**
 
-- Must call `ReleaseMessageArray()` to free allocated memory.
+- Must call `ReleaseMessageArray()` to free message content.
+- Must call `deinit()` on the ArrayList to free the list itself.
 
-### `buildUserPrompt(input_parameters: struct { root_prompt: ?[]const u8 = null, iteration: u32 = 0, context_count: u32 = 1, history_count: u32 = 0 }, allocator: std.mem.Allocator) ![]Message`
+### `buildUserPrompt(input_parameters: struct { root_prompt: ?[]const u8 = null, iteration: u32 = 0, context_count: u32 = 1, history_count: u32 = 0 }, allocator: std.mem.Allocator) !std.ArrayList(Message)`
 
 Builds user prompts that vary based on iteration number, available contexts, and conversation history.
 
@@ -359,16 +360,18 @@ Builds user prompts that vary based on iteration number, available contexts, and
 ```zig
 const allocator = std.heap.page_allocator;
 
-const first_prompt = try buildUserPrompt(.{ .root_prompt = "What is 2+2?", .iteration = 0 }, allocator);
-defer ReleaseMessageArray(first_prompt, allocator);
+var first_prompt = try buildUserPrompt(.{ .root_prompt = "What is 2+2?", .iteration = 0 }, allocator);
+defer first_prompt.deinit(allocator);
+defer ReleaseMessageArray(&first_prompt, allocator);
 
-const followup = try buildUserPrompt(.{ .iteration = 1, .context_count = 2 }, allocator);
-defer ReleaseMessageArray(followup, allocator);
+var followup = try buildUserPrompt(.{ .iteration = 1, .context_count = 2 }, allocator);
+defer followup.deinit(allocator);
+defer ReleaseMessageArray(&followup, allocator);
 ```
 
-### `ReleaseMessageArray(messages: []Message, allocator: std.mem.Allocator) void`
+### `ReleaseMessageArray(messages: *std.ArrayList(Message), allocator: std.mem.Allocator) void`
 
-Safely deallocates a message array and all message content.
+Safely deallocates all message content in the ArrayList. Note: This does NOT deallocate the ArrayList itself - you must call `deinit()` on the ArrayList separately.
 
 ---
 

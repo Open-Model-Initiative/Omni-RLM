@@ -274,8 +274,11 @@ test "RLMLogger log_iteration" {
     var logger = try RLMLogger.init("./logs", "Test rlmiteration", allocator);
     defer logger.deinit(allocator);
 
-    const iteration_data: RLMIteration = .{
-        .prompt = allocator.dupe(Message, &.{Message{ .role = "user", .content = "Calculate 1+1" }}) catch unreachable,
+    var prompt: std.ArrayList(Message) = .empty;
+    try prompt.append(allocator, Message{ .role = "user", .content = try allocator.dupe(u8, "Calculate 1+1") });
+
+    var iteration_data: RLMIteration = .{
+        .prompt = prompt,
         .response = "1+1=2",
         .code_blocks = allocator.dupe(CodeBlock, &.{CodeBlock{
             .code = "print(1+1)",
@@ -289,7 +292,10 @@ test "RLMLogger log_iteration" {
         .iteration_time = 10,
     };
     defer {
-        allocator.free(iteration_data.prompt);
+        for (iteration_data.prompt.items) |msg| {
+            allocator.free(msg.content);
+        }
+        iteration_data.prompt.deinit(allocator);
         allocator.free(iteration_data.code_blocks);
     }
 

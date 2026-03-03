@@ -104,12 +104,15 @@ pub const RLM = struct {
     }
 
     /// Set up the system prompt for the completion
-    fn setup_prompt(self: *RLM, prompt: []u8, allocator: std.mem.Allocator) ![]Message {
+    fn setup_prompt(self: *RLM, prompt: []u8, allocator: std.mem.Allocator) !std.ArrayList(Message) {
         // Implementation for setting up the prompt
         var metadata: QueryMetadata = QueryMetadata.init(prompt, allocator);
         defer metadata.deinit(allocator);
-        var message_history: []Message = undefined;
-        message_history = try PROMPT.buildSystemPrompt(self.custom_system_prompt, metadata, allocator);
+        var system_messages = try PROMPT.buildSystemPrompt(self.custom_system_prompt, metadata, allocator);
+        defer system_messages.deinit(allocator);
+
+        var message_history: std.ArrayList(Message) = .empty;
+        try message_history.appendSlice(allocator, system_messages.items);
         return message_history;
     }
 
@@ -122,12 +125,12 @@ pub const RLM = struct {
         const timestart = std.time.milliTimestamp();
 
         // Create a simple user message with just the prompt
-        var simple_message = try allocator.alloc(Message, 1);
-        defer allocator.free(simple_message);
-        simple_message[0] = Message{ .role = "user", .content = prompt };
+        var simple_message: std.ArrayList(Message) = .empty;
+        defer simple_message.deinit(allocator);
+        try simple_message.append(allocator, Message{ .role = "user", .content = prompt });
 
         // Make a direct request to the model
-        const response = try lm_handler.make_request(simple_message, allocator);
+        const response = try lm_handler.make_request(simple_message.items, allocator);
         defer allocator.free(response);
 
         const timeend = std.time.milliTimestamp();
@@ -143,32 +146,25 @@ pub const RLM = struct {
     }
 
     /// Default answer when max iterations reached without finding a final answer
-    fn default_answer(self: *RLM, prompt: []u8, message_history: []Message, lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
+    fn default_answer(self: *RLM, prompt: []u8, message_history: std.ArrayList(Message), lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
         _ = self;
         // Generate a final answer when max iterations reached without finding a final answer
         const timestart = std.time.milliTimestamp();
 
-        // Create a final prompt asking for a summary/answer based on the conversation
-        var final_prompt_message = try allocator.alloc(Message, 1);
-        defer allocator.free(final_prompt_message);
-        final_prompt_message[0] = Message{
+        // Create complete messages by cloning history and appending final prompt
+        var complete_messages: std.ArrayList(Message) = .empty;
+        defer complete_messages.deinit(allocator);
+        // Copy message history
+        try complete_messages.appendSlice(allocator, message_history.items);
+
+        // Append final prompt
+        try complete_messages.append(allocator, Message{
             .role = "user",
             .content = "Please provide a final answer to the user's question based on the information provided.",
-        };
-
-        // Combine message history with final prompt
-        var complete_messages = try allocator.alloc(Message, message_history.len + final_prompt_message.len);
-        defer allocator.free(complete_messages);
-
-        for (message_history, 0..) |msg, idx| {
-            complete_messages[idx] = msg;
-        }
-        for (final_prompt_message, 0..) |msg, idx| {
-            complete_messages[message_history.len + idx] = msg;
-        }
+        });
 
         // Make final request to get default answer
-        const response = try lm_handler.make_request(complete_messages, allocator);
+        const response = try lm_handler.make_request(complete_messages.items, allocator);
         defer allocator.free(response);
 
         const timeend = std.time.milliTimestamp();
@@ -228,30 +224,30 @@ pub const RLM = struct {
             return try self.fallback_answer(prompt, lm_handler, allocator);
         }
 
-        var message_history: []Message = try self.setup_prompt(prompt, allocator);
-        defer {
-            PROMPT.ReleaseMessageArray(message_history, allocator);
-        }
-        var current_prompt: []Message = try allocator.alloc(Message, 1);
-        defer allocator.free(current_prompt);
+        var message_history = try self.setup_prompt(prompt, allocator);
+        defer message_history.deinit(allocator);
+        defer PROMPT.ReleaseMessageArray(message_history, allocator);
 
         for (0..self.max_iterations) |i| {
-            const user_prompt = try PROMPT.buildUserPrompt(
+            var user_prompt = try PROMPT.buildUserPrompt(
                 .{
                     .root_prompt = root_prompt,
                     .iteration = @intCast(i),
                 },
                 allocator,
             );
-
+            defer user_prompt.deinit(allocator);
             defer PROMPT.ReleaseMessageArray(user_prompt, allocator);
-            current_prompt = try allocator.realloc(current_prompt, message_history.len + user_prompt.len);
-            for (message_history, 0..) |msg, idx| {
-                current_prompt[idx] = msg;
-            }
-            for (user_prompt, 0..) |msg, idx| {
-                current_prompt[message_history.len + idx] = msg;
-            }
+
+            // Build current_prompt using ArrayList
+            var current_prompt: std.ArrayList(Message) = .empty;
+            defer current_prompt.deinit(allocator);
+
+            // Append message history
+            try current_prompt.appendSlice(allocator, message_history.items);
+
+            // Append user prompt
+            try current_prompt.appendSlice(allocator, user_prompt.items);
 
             var iteration: RLMIteration = try self.completion_turn(current_prompt, lm_handler, env, allocator);
             defer {
@@ -286,22 +282,21 @@ pub const RLM = struct {
                 };
             }
 
-            const new_messages = try iteration.format_iteration(allocator);
-            defer allocator.free(new_messages);
-            message_history = try allocator.realloc(message_history, message_history.len + new_messages.len);
-            for (new_messages, 0..) |msg, idx| {
-                message_history[message_history.len - new_messages.len + idx] = msg;
-            }
+            var new_messages = try iteration.format_iteration(allocator);
+            defer new_messages.deinit(allocator);
+
+            // Append new messages to message_history
+            try message_history.appendSlice(allocator, new_messages.items);
         }
 
         return try self.default_answer(prompt, message_history, lm_handler, allocator);
     }
 
     /// Execute a single completion turn (one model request + code execution)
-    fn completion_turn(self: *RLM, prompt: []Message, lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
+    fn completion_turn(self: *RLM, prompt: std.ArrayList(Message), lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();
-        const response = try lm_handler.make_request(prompt, allocator);
+        const response = try lm_handler.make_request(prompt.items, allocator);
         // TODO: only support python code execution now, need to support bash code execution as well.
         var code_block_strs = try find_code_blocks(response, allocator);
         defer code_block_strs.deinit(allocator);

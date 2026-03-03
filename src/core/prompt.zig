@@ -120,11 +120,11 @@ pub const USER_PROMPT_WITH_ROOT: []const u8 =
 /// - `allocator`: Memory allocator for allocations
 ///
 /// ## Returns
-/// Array of Message structs containing the user prompt
+/// ArrayList of Message structs containing the user prompt
 ///
 /// ## Example
 /// ```zig
-/// const messages = try buildUserPrompt(.{
+/// var messages = try buildUserPrompt(.{
 ///     .root_prompt = "What is the capital of France?",
 ///     .iteration = 0,
 /// }, allocator);
@@ -138,7 +138,7 @@ pub fn buildUserPrompt(
         history_count: u32 = 0,
     },
     allocator: std.mem.Allocator,
-) ![]Message {
+) !std.ArrayList(Message) {
     const root_prompt = input_parameters.root_prompt;
     const iteration = input_parameters.iteration;
     const context_count = input_parameters.context_count;
@@ -207,50 +207,54 @@ pub fn buildUserPrompt(
         prompt = new_prompt;
     }
 
-    const message = Message{
+    var result: std.ArrayList(Message) = .empty;
+    try result.append(allocator, Message{
         .role = "user",
         .content = prompt,
-    };
-    const result = try allocator.alloc(Message, 1);
-    result[0] = message;
+    });
     return result;
 }
 
 test "buildUserPrompt works" {
     const allocator = std.testing.allocator;
     {
-        const prompt_no_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 0 }, allocator);
+        var prompt_no_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 0 }, allocator);
+        defer prompt_no_root.deinit(allocator);
         defer ReleaseMessageArray(prompt_no_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_no_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 0)\n{f}\n", .{formatter});
     }
     {
-        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 0 }, allocator);
+        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 0 }, allocator);
+        defer prompt_with_root.deinit(allocator);
         defer ReleaseMessageArray(prompt_with_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt with root:\n{f}\n", .{formatter});
     }
     {
-        const prompt_without_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 1 }, allocator);
+        var prompt_without_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 1 }, allocator);
+        defer prompt_without_root.deinit(allocator);
         defer ReleaseMessageArray(prompt_without_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_without_root }, .{});
         std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 1)\n{f}\n", .{formatter});
     }
     {
-        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .context_count = 2 }, allocator);
+        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .context_count = 2 }, allocator);
+        defer prompt_with_root.deinit(allocator);
         defer ReleaseMessageArray(prompt_with_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
         const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, context_count 2)\n{f}\n", .{formatter}) catch unreachable;
         defer allocator.free(out_string);
-        try std.testing.expectStringEndsWith(out_string, "Note: You have 2 contexts available (context_0 through context_1).\"}]}\n");
+        try std.testing.expectStringEndsWith(out_string, "Note: You have 2 contexts available (context_0 through context_1).\"}],\"capacity\":4}}\n");
     }
     {
-        const prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .history_count = 1 }, allocator);
+        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .history_count = 1 }, allocator);
+        defer prompt_with_root.deinit(allocator);
         defer ReleaseMessageArray(prompt_with_root, allocator);
         const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
         const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, history_count 1)\n{f}\n", .{formatter}) catch unreachable;
         defer allocator.free(out_string);
-        try std.testing.expectStringEndsWith(out_string, "Note: You have 1 prior conversation history available in the `history` variable.\"}]}\n");
+        try std.testing.expectStringEndsWith(out_string, "Note: You have 1 prior conversation history available in the `history` variable.\"}],\"capacity\":4}}\n");
     }
 }
 
@@ -265,18 +269,18 @@ test "buildUserPrompt works" {
 /// - `allocator`: Memory allocator for allocations
 ///
 /// ## Returns
-/// Array of 2 Message structs (system prompt and context info)
+/// ArrayList of 2 Message structs (system prompt and context info)
 ///
 /// ## Memory Management
-/// The caller must release both the returned array AND `result[1].content`
+/// The caller must release both the returned ArrayList AND its contents
 /// using `ReleaseMessageArray`.
 ///
 /// ## Example
 /// ```zig
-/// const system_msgs = try buildSystemPrompt(null, metadata, allocator);
+/// var system_msgs = try buildSystemPrompt(null, metadata, allocator);
 /// defer ReleaseMessageArray(system_msgs, allocator);
 /// ```
-pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) ![]Message {
+pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: QueryMetadata, allocator: std.mem.Allocator) !std.ArrayList(Message) {
     const context_lengths = query_metadata.context_length;
     const context_total_length = query_metadata.context_total_length;
     const context_type = query_metadata.context_type;
@@ -314,11 +318,9 @@ pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: Quer
         .{custom_system_prompt orelse RLM_SYSTEM_PROMPT},
     );
 
-    const Msg = [2]Message{
-        Message{ .role = "system", .content = system_content },
-        Message{ .role = "assistant", .content = tes },
-    };
-    const system_prompt = try allocator.dupe(Message, &Msg);
+    var system_prompt: std.ArrayList(Message) = .empty;
+    try system_prompt.append(allocator, Message{ .role = "system", .content = system_content });
+    try system_prompt.append(allocator, Message{ .role = "assistant", .content = tes });
     return system_prompt;
 }
 
@@ -329,30 +331,30 @@ test "buildSystemPrompt works" {
         .context_total_length = 16,
         .context_type = "str",
     };
-    const system_prompt = try buildSystemPrompt(null, query_metadata, allocator);
+    var system_prompt = try buildSystemPrompt(null, query_metadata, allocator);
+    defer system_prompt.deinit(allocator);
     defer ReleaseMessageArray(system_prompt, allocator);
     const formatter = std.json.fmt(.{ .message = system_prompt }, .{});
 
     std.debug.print("\nTESTING:System Prompt\n{f}\n", .{formatter});
 }
 
-/// Release memory for a message array
+/// Release memory for a message ArrayList
 ///
-/// Frees all content strings and the message array itself.
-/// Must be used to clean up arrays returned by buildUserPrompt and buildSystemPrompt.
+/// Frees all content strings and the ArrayList itself.
+/// Must be used to clean up ArrayLists returned by buildUserPrompt and buildSystemPrompt.
 ///
 /// ## Parameters
-/// - `messages`: The message array to release
+/// - `messages`: Pointer to the message ArrayList to release
 /// - `allocator`: Memory allocator used for allocations
 ///
 /// ## Example
 /// ```zig
-/// const messages = try buildUserPrompt(..., allocator);
-/// defer ReleaseMessageArray(messages, allocator);
+/// var messages = try buildUserPrompt(..., allocator);
+/// defer ReleaseMessageArray(&messages, allocator);
 /// ```
-pub fn ReleaseMessageArray(messages: []Message, allocator: std.mem.Allocator) void {
-    for (messages) |msg| {
+pub fn ReleaseMessageArray(messages: std.ArrayList(Message), allocator: std.mem.Allocator) void {
+    for (messages.items) |msg| {
         allocator.free(msg.content);
     }
-    allocator.free(messages);
 }
