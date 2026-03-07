@@ -122,6 +122,20 @@ pub fn main() !void {
 
 ## 💡 Usage Examples
 
+### OpenClaw-style agent in Zig
+
+A dedicated OpenClaw-style entry point is available at `src/example/openclaw.zig`. It wires Omni-RLM with an autonomous system prompt and can be run as:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+# Optional overrides:
+# export OPENAI_BASE_URL="https://api.openai.com/v1/chat/completions"
+# export OPENAI_MODEL="gpt-4o-mini"
+zig build openclaw -- "Implement a Fibonacci CLI and test it"
+```
+
+This gives you an agentic coding loop (plan → execute → reflect → final answer) while reusing Omni-RLM's recursion, logging, and environment tooling.
+
 ### Configuring Different Backends
 
 <details>
