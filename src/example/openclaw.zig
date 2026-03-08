@@ -7,7 +7,7 @@ const openclaw_system_prompt =
     \\Operate in a deliberate loop:
     \\1) Analyze the user task and environment.
     \\2) Propose a short plan.
-    \\3) Execute only the code or shell actions required.
+    \\3) Execute only the Python code required.
     \\4) Reflect on outputs and update the plan.
     \\5) Return a concise final answer.
     \\
@@ -15,7 +15,7 @@ const openclaw_system_prompt =
     \\- Keep actions minimal and verifiable.
     \\- Prefer deterministic commands.
     \\- If a step fails, explain why and provide the next best action.
-    \\- Always end with a "Final answer" section.
+    \\- Always end with either FINAL("<answer>") or FINAL_VAR("<variable_name>").
 ;
 
 fn readPrompt(allocator: std.mem.Allocator, args: [][:0]u8) ![]u8 {
