@@ -14,6 +14,8 @@ const openclaw_system_prompt =
     \\Rules:
     \\- Keep actions minimal and verifiable.
     \\- Prefer deterministic commands.
+    \\- Executable code MUST appear inside ```python or ```repl fenced blocks.
+    \\- Never output executable code in unlabeled ``` fences.
     \\- If a step fails, explain why and provide the next best action.
     \\- Always end with either FINAL("<answer>") or FINAL_VAR("<variable_name>").
 ;
