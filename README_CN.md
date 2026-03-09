@@ -64,6 +64,18 @@ cd Omni-RLM
 pip install dill # 仅在本地环境执行代码时需要
 ```
 
+3. 复制模板并创建 `.env` 文件：
+```bash
+cp .env.example .env
+```
+
+4. 填写 `.env` 配置：
+```dotenv
+OMNIRLM_API_KEY=sk-your-api-key-here
+OMNIRLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+OMNIRLM_MODEL_NAME=qwen-flash
+```
+
 ## 🚀 快速开始
 
 以下是一个简单的入门示例：
@@ -72,15 +84,20 @@ pip install dill # 仅在本地环境执行代码时需要
 zig build run
 ```
 
-**注意：请更换api_key为你自己的API密钥。**
+**注意：`zig build run` 现在会从 `.env` 读取后端配置。**
 
 ```zig
 const std = @import("std");
-const RLM = @import("omni-rlm.zig").RLM;
-const RLMLogger = @import("omni-rlm.zig").RLMLogger;
+const omni = @import("omni-rlm");
+const RLM = omni.RLM;
+const RLMLogger = omni.RLMLogger;
+const config_env = omni.config_env;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
+
+    var backend_cfg = try config_env.load_backend_env_config(allocator, ".env");
+    defer backend_cfg.deinit(allocator);
 
     // 初始化日志记录器
     const logger = try RLMLogger.init("./logs", "run", allocator);
@@ -89,9 +106,9 @@ pub fn main() !void {
     var rlm: RLM = .{
         .backend = "openai",
         .backend_kwargs = .{
-            .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            .api_key = "Bearer 你的API密钥",
-            .model_name = "qwen-plus",
+            .base_url = backend_cfg.base_url,
+            .api_key = backend_cfg.api_key,
+            .model_name = backend_cfg.model_name,
         },
         .environment = "local",
         .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
@@ -280,8 +297,9 @@ zig build quickstart
 ```
 Omni-RLM/
 ├── src/
-│   ├── omni-rlm.zig          # 对外导出 (RLM, RLMLogger)
+│   ├── omni-rlm.zig          # 对外导出 (RLM, RLMLogger, config_env)
 │   ├── core/
+│   │   ├── config_env.zig    # .env 后端配置加载器
 │   │   ├── rlm.zig           # 核心 RLM 调度逻辑
 │   │   ├── rlm_logger.zig    # 结构化日志系统
 │   │   ├── types.zig         # 类型定义与结构体

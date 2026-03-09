@@ -3,3 +3,5 @@ logs/
 .zig-cache/
 .DS_Store
 .vscode/
+.env
+!.env.example

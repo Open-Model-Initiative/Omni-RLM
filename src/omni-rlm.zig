@@ -29,3 +29,4 @@
 
 pub const RLM = @import("core/rlm.zig").RLM;
 pub const RLMLogger = @import("core/rlm_logger.zig").RLMLogger;
+pub const config_env = @import("core/config_env.zig");

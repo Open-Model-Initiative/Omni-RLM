@@ -1,19 +1,15 @@
-// Please provide valid api_key in the RLM initialization to run this quickstart example or it will return an attempt to use null value error.
 const RLMLogger = @import("omni-rlm").RLMLogger;
 const std = @import("std");
 const RLM = @import("omni-rlm").RLM;
+const config_env = @import("omni-rlm").config_env;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    const api_key = std.process.getEnvVarOwned(allocator, "DASHSCOPE_API_KEY") catch {
-        std.debug.print("Environment variable DASHSCOPE_API_KEY is not set.\n", .{});
-        return error.MissingApiKey;
+    var backend_cfg = config_env.load_backend_env_config(allocator, ".env") catch {
+        std.debug.print("Failed to load backend config from .env. Required keys: OMNIRLM_API_KEY (or DASHSCOPE_API_KEY/OPENAI_API_KEY), OMNIRLM_BASE_URL, OMNIRLM_MODEL_NAME.\n", .{});
+        return error.MissingBackendConfig;
     };
-    // const api_key = std.process.getEnvVarOwned(allocator, "MOONSHOT_API_KEY") catch {
-    //     std.debug.print("Environment variable MOONSHOT_API_KEY is not set.\n", .{});
-    //     return error.MissingApiKey;
-    // };
-    defer allocator.free(api_key);
+    defer backend_cfg.deinit(allocator);
 
     std.debug.print("\n*******RLM started*******\n", .{});
 
@@ -22,14 +18,10 @@ pub fn main() !void {
     var rlm: RLM =
         .{
             .backend = "openai",
-            // must provide full information of api_key, base_url, model_name in json format
             .backend_kwargs = .{
-                .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                .api_key = api_key,
-                .model_name = "qwen-flash",
-                // .base_url = "https://api.moonshot.cn/v1/chat/completions",
-                // .api_key = api_key,
-                // .model_name = "moonshot-v1-8k",
+                .base_url = backend_cfg.base_url,
+                .api_key = backend_cfg.api_key,
+                .model_name = backend_cfg.model_name,
             },
             .environment = "local",
             .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",

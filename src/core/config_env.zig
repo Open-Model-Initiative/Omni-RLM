@@ -1,0 +1,124 @@
+const std = @import("std");
+
+pub const BackendEnvConfig = struct {
+    api_key: []const u8,
+    base_url: []const u8,
+    model_name: []const u8,
+
+    pub fn deinit(self: *BackendEnvConfig, allocator: std.mem.Allocator) void {
+        allocator.free(self.api_key);
+        allocator.free(self.base_url);
+        allocator.free(self.model_name);
+    }
+};
+
+fn trim_quotes(value: []const u8) []const u8 {
+    if (value.len >= 2 and
+        ((value[0] == '"' and value[value.len - 1] == '"') or
+            (value[0] == '\'' and value[value.len - 1] == '\'')))
+    {
+        return value[1 .. value.len - 1];
+    }
+    return value;
+}
+
+fn resolve_env_value(allocator: std.mem.Allocator, value: []const u8) ![]const u8 {
+    if (value.len >= 4 and value[0] == '$' and value[1] == '{' and value[value.len - 1] == '}') {
+        const env_name = value[2 .. value.len - 1];
+        return std.process.getEnvVarOwned(allocator, env_name) catch error.MissingReferencedEnvVar;
+    }
+
+    if (value.len >= 2 and value[0] == '$') {
+        const env_name = value[1..];
+        return std.process.getEnvVarOwned(allocator, env_name) catch error.MissingReferencedEnvVar;
+    }
+
+    return allocator.dupe(u8, value);
+}
+
+fn parse_backend_from_content(allocator: std.mem.Allocator, content: []const u8) !BackendEnvConfig {
+    var api_key_raw: ?[]const u8 = null;
+    var base_url_raw: ?[]const u8 = null;
+    var model_name_raw: ?[]const u8 = null;
+
+    var lines = std.mem.splitScalar(u8, content, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0 or line[0] == '#') continue;
+
+        const eq_idx = std.mem.indexOfScalar(u8, line, '=') orelse continue;
+        const key = std.mem.trim(u8, line[0..eq_idx], " \t");
+        const value_part = std.mem.trim(u8, line[eq_idx + 1 ..], " \t");
+        const value = trim_quotes(value_part);
+
+        if (std.mem.eql(u8, key, "OMNIRLM_API_KEY") or
+            std.mem.eql(u8, key, "DASHSCOPE_API_KEY") or
+            std.mem.eql(u8, key, "OPENAI_API_KEY"))
+        {
+            api_key_raw = value;
+        } else if (std.mem.eql(u8, key, "OMNIRLM_BASE_URL")) {
+            base_url_raw = value;
+        } else if (std.mem.eql(u8, key, "OMNIRLM_MODEL_NAME")) {
+            model_name_raw = value;
+        }
+    }
+
+    if (api_key_raw == null or base_url_raw == null or model_name_raw == null) {
+        return error.MissingRequiredEnvKey;
+    }
+
+    const api_key = try resolve_env_value(allocator, api_key_raw.?);
+    errdefer allocator.free(api_key);
+    const base_url = try resolve_env_value(allocator, base_url_raw.?);
+    errdefer allocator.free(base_url);
+    const model_name = try resolve_env_value(allocator, model_name_raw.?);
+    errdefer allocator.free(model_name);
+
+    return .{ .api_key = api_key, .base_url = base_url, .model_name = model_name };
+}
+
+/// Load backend config from a .env-like file.
+///
+/// Required keys:
+/// - OMNIRLM_API_KEY (or DASHSCOPE_API_KEY / OPENAI_API_KEY)
+/// - OMNIRLM_BASE_URL
+/// - OMNIRLM_MODEL_NAME
+pub fn load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u8) !BackendEnvConfig {
+    const content = try std.fs.cwd().readFileAlloc(allocator, env_path, 1024 * 1024);
+    defer allocator.free(content);
+
+    return parse_backend_from_content(allocator, content);
+}
+
+test "parse backend config from dotenv content" {
+    const allocator = std.testing.allocator;
+    const content =
+        \\OMNIRLM_API_KEY=sk-test
+        \\OMNIRLM_BASE_URL=https://example.com/v1/chat/completions
+        \\OMNIRLM_MODEL_NAME=qwen-plus
+    ;
+
+    var cfg = try parse_backend_from_content(allocator, content);
+    defer cfg.deinit(allocator);
+
+    try std.testing.expectEqualStrings("sk-test", cfg.api_key);
+    try std.testing.expectEqualStrings("https://example.com/v1/chat/completions", cfg.base_url);
+    try std.testing.expectEqualStrings("qwen-plus", cfg.model_name);
+}
+
+test "parse backend config with env reference" {
+    const allocator = std.testing.allocator;
+    const home = std.process.getEnvVarOwned(allocator, "HOME") catch return error.SkipZigTest;
+    defer allocator.free(home);
+
+    const content =
+        \\OMNIRLM_API_KEY=${HOME}
+        \\OMNIRLM_BASE_URL=https://example.com/v1/chat/completions
+        \\OMNIRLM_MODEL_NAME=qwen-plus
+    ;
+
+    var cfg = try parse_backend_from_content(allocator, content);
+    defer cfg.deinit(allocator);
+
+    try std.testing.expectEqualStrings(home, cfg.api_key);
+}

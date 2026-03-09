@@ -65,6 +65,18 @@ cd Omni-RLM
 pip install dill # Only needed if executing code in local environment
 ``` 
 
+3. Copy the template and create your `.env` file:
+```bash
+cp .env.example .env
+```
+
+4. Fill your `.env` values:
+```dotenv
+OMNIRLM_API_KEY=sk-your-api-key-here
+OMNIRLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+OMNIRLM_MODEL_NAME=qwen-flash
+```
+
 ## 🚀 Quick Start
 
 Here's a simple example to get you started:
@@ -73,17 +85,22 @@ Here's a simple example to get you started:
 zig build run
 ```
 
-IMPORTANT: Replace `"your-api-key-here"` with your actual API key.
+IMPORTANT: `zig build run` now loads backend config from `.env`.
 
 ```zig
 !src/example/run.zig
 
 const std = @import("std");
-const RLM = @import("omni-rlm.zig").RLM;
-const RLMLogger = @import("omni-rlm.zig").RLMLogger;
+const omni = @import("omni-rlm");
+const RLM = omni.RLM;
+const RLMLogger = omni.RLMLogger;
+const config_env = omni.config_env;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
+
+    var backend_cfg = try config_env.load_backend_env_config(allocator, ".env");
+    defer backend_cfg.deinit(allocator);
 
     // Initialize logger
     const logger = try RLMLogger.init("./logs", "run", allocator);
@@ -92,9 +109,9 @@ pub fn main() !void {
     var rlm: RLM = .{
         .backend = "openai",
         .backend_kwargs = .{
-            .base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            .api_key = "sk-your-api-key-here",
-            .model_name = "qwen-plus",
+            .base_url = backend_cfg.base_url,
+            .api_key = backend_cfg.api_key,
+            .model_name = backend_cfg.model_name,
         },
         .environment = "local",
         .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
@@ -204,8 +221,9 @@ The logger creates structured JSON logs that include:
 ```
 Omni-RLM/
 ├── src/
-│   ├── omni-rlm.zig          # Public exports (RLM, RLMLogger)
+│   ├── omni-rlm.zig          # Public exports (RLM, RLMLogger, config_env)
 │   ├── core/
+│   │   ├── config_env.zig    # .env backend config loader
 │   │   ├── rlm.zig           # Core RLM orchestrator
 │   │   ├── rlm_logger.zig    # Structured logging system
 │   │   ├── types.zig         # Type definitions and structs
@@ -233,7 +251,7 @@ Omni-RLM/
 
 ### Key Files
 
-- **`src/omni-rlm.zig`**: Package interface
+- **`src/omni-rlm.zig`**: Package interface and `config_env` export
 - **`src/core/rlm.zig`**: Main entry point with RLM struct and completion logic
 - **`src/core/rlm_logger.zig`**: Handles all logging operations with JSON output
 - **`src/core/types.zig`**: Shared type definitions (metadata, message, code blocks)

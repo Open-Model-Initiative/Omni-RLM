@@ -2,6 +2,63 @@
 
 ## Core Types
 
+## Config Helpers
+
+### `BackendEnvConfig` - `.env` Backend Configuration
+
+Typed backend configuration loaded from a `.env`-style file.
+
+#### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `api_key` | `[]const u8` | API key/token for backend requests |
+| `base_url` | `[]const u8` | Chat completion endpoint URL |
+| `model_name` | `[]const u8` | Model name to request |
+
+#### Methods
+
+##### `deinit(self: *BackendEnvConfig, allocator: std.mem.Allocator) void`
+
+Frees all allocated fields in the config.
+
+### `load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u8) !BackendEnvConfig`
+
+Loads backend settings from a `.env`-style file.
+
+#### Required keys
+
+- `OMNIRLM_API_KEY` (or `DASHSCOPE_API_KEY` / `OPENAI_API_KEY`)
+- `OMNIRLM_BASE_URL`
+- `OMNIRLM_MODEL_NAME`
+
+#### Example
+
+```zig
+const omni = @import("omni-rlm");
+const config_env = omni.config_env;
+
+const allocator = std.heap.page_allocator;
+var cfg = try config_env.load_backend_env_config(allocator, ".env");
+defer cfg.deinit(allocator);
+
+var rlm: omni.RLM = .{
+  .backend = "openai",
+  .backend_kwargs = .{
+    .api_key = cfg.api_key,
+    .base_url = cfg.base_url,
+    .model_name = cfg.model_name,
+  },
+  .allocator = allocator,
+};
+```
+
+#### Notes
+
+- Supports comments (`# ...`) and empty lines.
+- Values wrapped in single or double quotes are unquoted.
+- Returns `error.MissingRequiredEnvKey` if any required key is missing.
+
 ### `backendKwargs` - Backend Configuration
 
 Typed backend configuration passed to the model handler.
