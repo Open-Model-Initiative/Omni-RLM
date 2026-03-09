@@ -1,3 +1,4 @@
+# DEPRECATED: This script is deprecated and will be removed in future versions. Please use the `daytona` CLI tool or the Daytona Python SDK directly for interacting with Daytona environments.
 from daytona import Daytona, DaytonaConfig
 import argparse
 
