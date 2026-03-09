@@ -1,6 +1,7 @@
 const std = @import("std");
 const RLM = @import("omni-rlm").RLM;
 const RLMLogger = @import("omni-rlm").RLMLogger;
+const config_env = @import("omni-rlm").config_env;
 
 const openclaw_system_prompt =
     \\You are OpenClaw-Zig, an autonomous coding and operations assistant powered by Omni-RLM.
@@ -12,12 +13,14 @@ const openclaw_system_prompt =
     \\5) Return a concise final answer.
     \\
     \\Rules:
+    \\- You can use os lib to access the working directory, and can manipulate files.
     \\- Keep actions minimal and verifiable.
     \\- Prefer deterministic commands.
     \\- Executable code MUST appear inside ```python or ```repl fenced blocks.
+    \\- Always use print() for any output from Python code, never return values directly from code blocks.
     \\- Never output executable code in unlabeled ``` fences.
     \\- If a step fails, explain why and provide the next best action.
-    \\- Always end with either FINAL("<answer>") or FINAL_VAR("<variable_name>").
+    \\- If you have a final answer, end with either FINAL("<answer>") or FINAL_VAR("<variable_name>").
 ;
 
 fn readPrompt(allocator: std.mem.Allocator, args: [][:0]u8) ![]u8 {
@@ -31,7 +34,7 @@ fn readPrompt(allocator: std.mem.Allocator, args: [][:0]u8) ![]u8 {
         .{},
     );
 
-    return try allocator.dupe(u8, "Inspect this repository and suggest one improvement.");
+    return try allocator.dupe(u8, "Tell me what is the main purpose of the project in the current working directory. ");
 }
 
 pub fn main() !void {
@@ -39,17 +42,11 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    const api_key = std.process.getEnvVarOwned(allocator, "OPENAI_API_KEY") catch {
-        std.debug.print("Environment variable OPENAI_API_KEY is not set.\n", .{});
-        return error.MissingApiKey;
+    var backend_cfg = config_env.load_backend_env_config(allocator, ".env") catch {
+        std.debug.print("Failed to load backend config from .env. Required keys: OMNIRLM_API_KEY (or DASHSCOPE_API_KEY/OPENAI_API_KEY), OMNIRLM_BASE_URL, OMNIRLM_MODEL_NAME.\n", .{});
+        return error.MissingBackendConfig;
     };
-    defer allocator.free(api_key);
-
-    const base_url = std.process.getEnvVarOwned(allocator, "OPENAI_BASE_URL") catch try allocator.dupe(u8, "https://api.openai.com/v1/chat/completions");
-    defer allocator.free(base_url);
-
-    const model_name = std.process.getEnvVarOwned(allocator, "OPENAI_MODEL") catch try allocator.dupe(u8, "gpt-4o-mini");
-    defer allocator.free(model_name);
+    defer backend_cfg.deinit(allocator);
 
     const task_prompt = try readPrompt(allocator, args);
     defer allocator.free(task_prompt);
@@ -59,9 +56,9 @@ pub fn main() !void {
     var rlm: RLM = .{
         .backend = "openai",
         .backend_kwargs = .{
-            .base_url = base_url,
-            .api_key = api_key,
-            .model_name = model_name,
+            .base_url = backend_cfg.base_url,
+            .api_key = backend_cfg.api_key,
+            .model_name = backend_cfg.model_name,
         },
         .environment = "local",
         .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
