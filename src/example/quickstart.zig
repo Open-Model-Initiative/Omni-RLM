@@ -24,7 +24,7 @@ test "quickstart run" {
                 .model_name = backend_cfg.model_name,
             },
             .environment = "local",
-            .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
+            .environment_kwargs = "{}",
             .max_depth = 1,
             .logger = logger,
             .allocator = allocator,

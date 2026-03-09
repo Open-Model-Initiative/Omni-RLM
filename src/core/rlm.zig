@@ -42,7 +42,7 @@ const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 ///         .model_name = "gpt-4",
 ///     },
 ///     .environment = "local",
-///     .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
+///     .environment_kwargs = "{}",
 ///     .max_depth = 2,
 ///     .max_iterations = 10,
 ///     .allocator = allocator,

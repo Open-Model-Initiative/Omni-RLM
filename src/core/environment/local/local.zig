@@ -1,22 +1,38 @@
 const std = @import("std");
 
+const local_init_script =
+    \\import dill, sys
+    \\def FINAL_VAR(name):
+    \\    variable_name = name.strip().strip("\"'")
+    \\    if variable_name in globals():
+    \\        return str(globals()[variable_name])
+    \\    return None
+    \\def FINAL(name):
+    \\    """Return the value as a final answer."""
+    \\    return str(name)
+    \\code = sys.argv[1]
+    \\context = sys.argv[2] if len(sys.argv) > 2 else ""
+    \\try:
+    \\    dill.load_session("env.dill")
+    \\except FileNotFoundError:
+    \\    pass
+    \\exec(code)
+    \\del code
+    \\dill.dump_session("env.dill")
+;
+
 /// Local Python environment handler
 ///
 /// Manages local Python code execution using subprocess.
 /// The Python REPL maintains state across code executions via pickle serialization.
 ///
 /// ## Fields
-/// - `mainfunc`: Path to the Python initialization script (env_init.py)
 /// - `context`: The user prompt/context passed to the Python environment
 ///
 /// ## Example
 /// ```zig
 /// var env = LocalEnv{};
-/// try env.init(
-///     "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
-///     "What is 2+2?",
-///     allocator
-/// );
+/// try env.init("What is 2+2?", allocator);
 /// defer env.deinit();
 ///
 /// const result = try env.execute_code("print(2+2)", allocator);
@@ -24,7 +40,6 @@ const std = @import("std");
 /// defer allocator.free(result.stderr);
 /// ```
 pub const LocalEnv = struct {
-    mainfunc: []const u8 = "",
     context: ?[]const u8 = null,
 
     /// Execute Python code in the local REPL environment
@@ -44,26 +59,22 @@ pub const LocalEnv = struct {
     pub fn execute_code(self: *const LocalEnv, code: []const u8, allocator: std.mem.Allocator) !std.process.Child.RunResult {
         const result = try std.process.Child.run(.{
             .allocator = allocator,
-            .argv = &[_][]const u8{ "python", self.mainfunc, code, self.context orelse "" },
+            .argv = &[_][]const u8{ "python", "-c", local_init_script, code, self.context orelse "" },
         });
         return result;
     }
 
     /// Initialize the local environment
     ///
-    /// Parses configuration from JSON and sets up the context.
+    /// Stores prompt context for the local execution session.
     ///
     /// ## Parameters
-    /// - `kwargs`: JSON string with configuration (mainfunc path)
     /// - `prompt`: The user prompt/context
     /// - `allocator`: Memory allocator for allocations
     ///
     /// ## Errors
-    /// Returns error if JSON parsing fails
-    pub fn init(self: *LocalEnv, kwargs: []const u8, prompt: []const u8, allocator: std.mem.Allocator) !void {
-        const parsed: std.json.Parsed(LocalEnv) = try std.json.parseFromSlice(LocalEnv, allocator, kwargs, .{});
-        defer parsed.deinit();
-        self.* = parsed.value;
+    /// Reserved for interface compatibility; currently does not return custom init errors.
+    pub fn init(self: *LocalEnv, prompt: []const u8) !void {
         self.context = prompt;
     }
 
@@ -91,11 +102,28 @@ pub const LocalEnv = struct {
     /// Returns error if parsing fails
     pub fn find_final_answer(self: *const LocalEnv, text: []const u8, allocator: std.mem.Allocator) !?[]const u8 {
         _ = self;
+        const find_final_answer_script =
+            \\import re, sys, dill
+            \\dill.load_session("env.dill")
+            \\text = sys.argv[1]
+            \\final_var_pattern = r"^\s*FINAL(_VAR)?\((.*?)\)"
+            \\match = re.search(final_var_pattern, text, re.MULTILINE | re.DOTALL)
+            \\if match:
+            \\    variable_name = match.group(2).strip().strip('"').strip("'")
+            \\    if variable_name in globals():
+            \\        final_answer = FINAL_VAR(variable_name)
+            \\    else:
+            \\        final_answer = FINAL(variable_name)
+            \\    if final_answer is not None:
+            \\        final_answer = final_answer.strip()
+            \\    print(final_answer if final_answer else None)
+        ;
         const res = try std.process.Child.run(.{
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "src/core/environment/local/find_final_answer.py",
+                "-c",
+                find_final_answer_script,
                 text,
             },
         });
@@ -109,10 +137,9 @@ pub const LocalEnv = struct {
     }
 };
 
-test "read json kwargs in LocalEnv" {
-    const allocator = std.testing.allocator;
-    const kwags = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}";
-    const parsed: std.json.Parsed(LocalEnv) = try std.json.parseFromSlice(LocalEnv, allocator, kwags, .{});
-    defer parsed.deinit();
-    try std.testing.expectEqualStrings("src/core/environment/local/env_init.py", parsed.value.mainfunc);
+test "LocalEnv init sets context" {
+    var env = LocalEnv{};
+    try env.init("test prompt");
+    try std.testing.expect(env.context != null);
+    try std.testing.expectEqualStrings("test prompt", env.context.?);
 }

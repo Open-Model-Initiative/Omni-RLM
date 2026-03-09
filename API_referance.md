@@ -276,7 +276,7 @@ Shuts down the environment and releases resources.
 ```zig
 var env: EnvHandler = undefined;
 const etype = std.meta.stringToEnum(env_type, "local") orelse env_type.local;
-try env.init(etype, "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}", "", allocator);
+try env.init(etype, "{}", "", allocator);
 const result = try env.execute_code("print('hello')", allocator);
 defer {
   allocator.free(result.stdout);
@@ -291,13 +291,11 @@ try env.deinit(allocator);
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mainfunc` | `[]const u8` | `""` | Path to the python entry script |
 | `context` | `?[]const u8` | `null` | Execution code passed to the REPL environment |
 
 #### Notes
 
-- Expects `mainfunc` to accept `(code, context)` arguments.
-- Uses `src/core/environment/local/env_init.py` in examples/tests.
+- Local runner uses an embedded Python init script and persists session state in `env.dill`.
 
 ### `DaytonaEnv` - Remote Daytona Runner
 

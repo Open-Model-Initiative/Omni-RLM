@@ -20,7 +20,7 @@ pub const env_type = enum {
 /// ## Example
 /// ```zig
 /// var env: EnvHandler = undefined;
-/// try env.init(env_type.local, kwargs, prompt, allocator);
+/// try env.init(env_type.local, "{}", prompt, allocator);
 /// defer env.deinit(allocator) catch {};
 ///
 /// const result = try env.execute_code("print('hello')", allocator);
@@ -43,7 +43,7 @@ pub const EnvHandler = union(env_type) {
         switch (etype) {
             .local => {
                 var local_env = local{};
-                try local_env.init(kwargs, prompt, allocator);
+                try local_env.init(prompt);
                 self.* = .{ .local = local_env };
             },
             .daytona => {
@@ -126,7 +126,7 @@ test "EnvHandler local execute_code" {
 
     //// Test with local environment
     const environment = "local";
-    const kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}";
+    const kwargs = "{}";
 
     var env: EnvHandler = undefined;
     const Test_env_type = std.meta.stringToEnum(env_type, environment) orelse env_type.local;

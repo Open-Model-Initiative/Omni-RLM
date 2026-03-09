@@ -114,7 +114,7 @@ pub fn main() !void {
             .model_name = backend_cfg.model_name,
         },
         .environment = "local",
-        .environment_kwargs = "{\"mainfunc\": \"src/core/environment/local/env_init.py\"}",
+        .environment_kwargs = "{}",
         .max_depth = 1,
         .logger = logger,
         .allocator = allocator,
@@ -247,9 +247,7 @@ Omni-RLM/
 │   │   └── environment/
 │   │       ├── type.zig      # EnvHandler and env types
 │   │       ├── local/        # Local Python environment
-│   │       │   ├── local.zig # Local runner implementation
-│   │       │   ├── env_init.py       # Environment initialization script
-│   │       │   └── find_final_answer.py
+│   │       │   └── local.zig # Local runner implementation
 │   │       └── daytona/      # Daytona environment
 │   │           └── daytona.zig       # Daytona runner
 │   │           └── daytona_script.py # Daytona helper script
