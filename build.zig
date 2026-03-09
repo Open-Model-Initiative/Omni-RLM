@@ -30,6 +30,27 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(debug);
 
+    const openclaw = b.addExecutable(.{
+        .name = "openclaw",
+        .root_module = b.addModule("openclaw", .{
+            .root_source_file = b.path("src/example/openclaw.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "omni-rlm", .module = omni_rlm },
+            },
+        }),
+    });
+
+    const openclaw_run_artifact = b.addRunArtifact(openclaw);
+    if (b.args) |args| {
+        openclaw_run_artifact.addArgs(args);
+    }
+    const openclaw_step = b.step("openclaw", "Run the OpenClaw-style Omni-RLM example");
+    openclaw_step.dependOn(&openclaw_run_artifact.step);
+
+    b.installArtifact(openclaw);
+
     const test_comp = b.addTest(.{
         .root_module = b.addModule("test", .{
             .root_source_file = b.path("src/test.zig"),
