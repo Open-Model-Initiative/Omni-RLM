@@ -1,4 +1,5 @@
 const std = @import("std");
+const config_env = @import("../../config_env.zig");
 
 /// Daytona sandbox environment handler
 ///
@@ -52,7 +53,7 @@ pub const DaytonaEnv = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "environment/daytona_script.py",
+                "src/core/environment/daytona/daytona_script.py",
                 self.api_key,
                 "--api-url",
                 self.api_url,
@@ -84,7 +85,7 @@ pub const DaytonaEnv = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "environment/daytona_script.py",
+                "src/core/environment/daytona/daytona_script.py",
                 self.api_key,
                 "--api-url",
                 self.api_url,
@@ -122,7 +123,7 @@ pub const DaytonaEnv = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "environment/daytona_script.py",
+                "src/core/environment/daytona/daytona_script.py",
                 self.api_key,
                 "--api-url",
                 self.api_url,
@@ -153,7 +154,7 @@ pub const DaytonaEnv = struct {
             .allocator = allocator,
             .argv = &[_][]const u8{
                 "python",
-                "environment/daytona_script.py",
+                "src/core/environment/daytona/daytona_script.py",
                 self.api_key,
                 "--api-url",
                 self.api_url,
@@ -177,13 +178,19 @@ pub const DaytonaEnv = struct {
 
 test "DaytonaEnv execute_code" {
     const allocator = std.testing.allocator;
-    const kwargs = "{\"api_url\": \"https://app.daytona.io/api\", \"api_key\": \"\"}";
-    const parsed = try std.json.parseFromSlice(DaytonaEnv, allocator, kwargs, .{});
-    defer parsed.deinit();
-    if (parsed.value.api_key.len == 0) {
+    var daytona_cfg = config_env.load_daytona_env_config(allocator, ".env") catch {
         std.debug.print("\nSkipping DaytonaEnv execute_code test due to missing daytona api_key.\n", .{});
         return error.SkipZigTest;
-    }
+    };
+    defer daytona_cfg.deinit(allocator);
+
+    const kwargs = try std.fmt.allocPrint(
+        allocator,
+        "{{\"api_url\": \"{s}\", \"api_key\": \"{s}\"}}",
+        .{ daytona_cfg.api_url, daytona_cfg.api_key },
+    );
+    defer allocator.free(kwargs);
+
     var env = DaytonaEnv{};
     try env.init(kwargs, "This is a prompt", allocator);
     const code = "print(context)\nprint('Hello from DaytonaEnv')";
