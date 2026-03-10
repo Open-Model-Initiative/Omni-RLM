@@ -88,8 +88,6 @@ zig build run
 IMPORTANT: `zig build run` now loads backend config from `.env`.
 
 ```zig
-!src/example/run.zig
-
 const std = @import("std");
 const omni = @import("omni-rlm");
 const RLM = omni.RLM;
@@ -253,7 +251,8 @@ Omni-RLM/
 │   │           └── daytona_script.py # Daytona helper script
 │   └── example/
 │       ├── quickstart.zig    # Example usage (use for debug and testing)
-│       └── run.zig           # Example runner
+│       ├── run.zig           # Example runner
+│       └── openclaw.zig      # OpenClaw-style autonomous agent
 ├── API_referance.md     # API reference documentation
 ├── build.zig
 ├── build.zig.zon

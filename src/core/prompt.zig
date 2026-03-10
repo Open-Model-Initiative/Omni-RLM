@@ -128,6 +128,7 @@ pub const USER_PROMPT_WITH_ROOT: []const u8 =
 ///     .root_prompt = "What is the capital of France?",
 ///     .iteration = 0,
 /// }, allocator);
+/// defer messages.deinit(allocator);
 /// defer ReleaseMessageArray(messages, allocator);
 /// ```
 pub fn buildUserPrompt(
@@ -341,17 +342,19 @@ test "buildSystemPrompt works" {
 
 /// Release memory for a message ArrayList
 ///
-/// Frees all content strings and the ArrayList itself.
+/// Frees all content strings in the ArrayList.
 /// Must be used to clean up ArrayLists returned by buildUserPrompt and buildSystemPrompt.
+/// Note: This does NOT deallocate the ArrayList itself - you must call `deinit()` separately.
 ///
 /// ## Parameters
-/// - `messages`: Pointer to the message ArrayList to release
+/// - `messages`: The message ArrayList to release (passed by value)
 /// - `allocator`: Memory allocator used for allocations
 ///
 /// ## Example
 /// ```zig
 /// var messages = try buildUserPrompt(..., allocator);
-/// defer ReleaseMessageArray(&messages, allocator);
+/// defer messages.deinit(allocator);
+/// defer ReleaseMessageArray(messages, allocator);
 /// ```
 pub fn ReleaseMessageArray(messages: std.ArrayList(Message), allocator: std.mem.Allocator) void {
     for (messages.items) |msg| {

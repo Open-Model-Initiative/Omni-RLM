@@ -22,6 +22,27 @@ Typed backend configuration loaded from a `.env`-style file.
 
 Frees all allocated fields in the config.
 
+---
+
+### `backendKwargs.deinit` - Free Backend Configuration
+
+```zig
+pub fn deinit(self: *backendKwargs, allocator: std.mem.Allocator) void
+```
+
+Frees all allocated string fields (`api_key`, `base_url`, `model_name`).
+
+#### Example
+
+```zig
+var kwargs = backendKwargs{
+    .api_key = try allocator.dupe(u8, "sk-..."),
+    .base_url = try allocator.dupe(u8, "https://api.example.com/v1/chat/completions"),
+    .model_name = try allocator.dupe(u8, "gpt-4"),
+};
+defer kwargs.deinit(allocator);
+```
+
 ### `load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u8) !BackendEnvConfig`
 
 Loads backend settings from a `.env`-style file.
@@ -295,7 +316,9 @@ try env.deinit(allocator);
 
 #### Notes
 
-- Local runner uses an embedded Python init script and persists session state in `env.dill`.
+- Local runner uses an embedded Python init script and persists session state in `env.dill`
+- The `context` field stores the user prompt passed during initialization
+- Session state is maintained across code executions via pickle serialization
 
 ### `DaytonaEnv` - Remote Daytona Runner
 
@@ -335,7 +358,9 @@ Sends a chat completion request to the configured API endpoint.
 - `messages`: Array of `Message` structs forming the conversation
 - `allocator`: Memory allocator
 
-**Returns:** Response text from the model as a string
+**Returns:** Response text from the model as a string (caller owns memory)
+
+**Errors:** Returns error if HTTP request fails, response parsing fails, or expected fields are missing from response
 
 ### `RLM` - Main Orchestrator
 
@@ -417,14 +442,14 @@ const allocator = std.heap.page_allocator;
 
 var first_prompt = try buildUserPrompt(.{ .root_prompt = "What is 2+2?", .iteration = 0 }, allocator);
 defer first_prompt.deinit(allocator);
-defer ReleaseMessageArray(&first_prompt, allocator);
+defer ReleaseMessageArray(first_prompt, allocator);
 
 var followup = try buildUserPrompt(.{ .iteration = 1, .context_count = 2 }, allocator);
 defer followup.deinit(allocator);
-defer ReleaseMessageArray(&followup, allocator);
+defer ReleaseMessageArray(followup, allocator);
 ```
 
-### `ReleaseMessageArray(messages: *std.ArrayList(Message), allocator: std.mem.Allocator) void`
+### `ReleaseMessageArray(messages: std.ArrayList(Message), allocator: std.mem.Allocator) void`
 
 Safely deallocates all message content in the ArrayList. Note: This does NOT deallocate the ArrayList itself - you must call `deinit()` on the ArrayList separately.
 
@@ -440,7 +465,7 @@ Represents an extracted code block with its language label and content.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `label` | `[]const u8` | The language tag of the code block (e.g., "python", "bash") |
+| `label` | `[]const u8` | The language tag of the code block (e.g., "python", "repl") |
 | `code` | `[]const u8` | The actual code content inside the block |
 
 ### `find_code_blocks(input: []const u8, allocator: std.mem.Allocator) !std.ArrayList(CodeToBeRun)`
@@ -465,6 +490,7 @@ for (blocks.items) |block| {
 - Both `label` and `code` slices reference the original `input` buffer
 - Handles both Windows (\r\n) and Unix (\n) line endings
 - Empty code blocks (consecutive closing backticks) are not included in results
+- **Note**: Currently only extracts Python code blocks (labels "python" or "repl")
 
 ---
 
@@ -487,6 +513,8 @@ for (blocks.items) |block| {
 
 Creates and initializes a new logger instance.
 
+Creates the log directory if it doesn't exist and generates a unique log filename with timestamp and random ID in the format: `{file_name}_{timestamp}_{random_id}.jsonl`
+
 ##### `log_iteration(self: *RLMLogger, iteration_data: RLMIteration, allocator: std.mem.Allocator) !void`
 
 Logs data for a single iteration to the log file, with added `type`, `iteration`, and `timestamp` fields.
@@ -495,7 +523,8 @@ Logs data for a single iteration to the log file, with added `type`, `iteration`
 
 Logs metadata for the RLM session (only once per logger instance).
 
+**Security Note**: The API key is automatically stripped from the logged output for security.
+
 ##### `deinit(self: *RLMLogger, allocator: std.mem.Allocator) void`
 
 Cleans up logger resources.
-defer ReleaseMessageArray(next_prompt, allocator);

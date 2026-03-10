@@ -1,16 +1,33 @@
 const std = @import("std");
 const backendKwargs = @import("types.zig").backendKwargs;
 
+/// Daytona environment configuration
+///
+/// Configuration for connecting to Daytona sandbox API
+///
+/// ## Fields
+/// - `api_key`: API key for Daytona authentication
+/// - `api_url`: Daytona API endpoint URL (defaults to https://app.daytona.io/api)
 pub const DaytonaEnvConfig = struct {
     api_key: []const u8,
     api_url: []const u8,
 
+    /// Deinitialize DaytonaEnvConfig
+    ///
+    /// Frees all allocated string fields (`api_key`, `api_url`)
+    ///
+    /// ## Parameters
+    /// - `allocator`: Memory allocator used for allocations
     pub fn deinit(self: *DaytonaEnvConfig, allocator: std.mem.Allocator) void {
         allocator.free(self.api_key);
         allocator.free(self.api_url);
     }
 };
 
+/// Trim quotes from a string value
+///
+/// Removes surrounding single or double quotes from a string.
+/// Used when parsing .env file values.
 fn trim_quotes(value: []const u8) []const u8 {
     if (value.len >= 2 and
         ((value[0] == '"' and value[value.len - 1] == '"') or
@@ -21,6 +38,13 @@ fn trim_quotes(value: []const u8) []const u8 {
     return value;
 }
 
+/// Resolve environment variable references in a value
+///
+/// Supports ${VAR} and $VAR syntax for referencing environment variables.
+/// If no reference is found, returns a dupe of the original value.
+///
+/// ## Errors
+/// Returns `error.MissingReferencedEnvVar` if the referenced env var is not set
 fn resolve_env_value(allocator: std.mem.Allocator, value: []const u8) ![]const u8 {
     if (value.len >= 4 and value[0] == '$' and value[1] == '{' and value[value.len - 1] == '}') {
         const env_name = value[2 .. value.len - 1];
@@ -35,6 +59,13 @@ fn resolve_env_value(allocator: std.mem.Allocator, value: []const u8) ![]const u
     return allocator.dupe(u8, value);
 }
 
+/// Parse backend configuration from .env content
+///
+/// Extracts OMNIRLM_API_KEY (or DASHSCOPE_API_KEY / OPENAI_API_KEY),
+/// OMNIRLM_BASE_URL, and OMNIRLM_MODEL_NAME from .env content.
+///
+/// ## Errors
+/// Returns `error.MissingRequiredEnvKey` if any required key is missing
 fn parse_backend_from_content(allocator: std.mem.Allocator, content: []const u8) !backendKwargs {
     var api_key_raw: ?[]const u8 = null;
     var base_url_raw: ?[]const u8 = null;
@@ -76,6 +107,13 @@ fn parse_backend_from_content(allocator: std.mem.Allocator, content: []const u8)
     return .{ .api_key = api_key, .base_url = base_url, .model_name = model_name };
 }
 
+/// Parse Daytona configuration from .env content
+///
+/// Extracts DAYTONA_API_KEY (or OMNIRLM_DAYTONA_API_KEY) and
+/// optional DAYTONA_API_URL from .env content.
+///
+/// ## Errors
+/// Returns `error.MissingRequiredEnvKey` if API key is not found
 fn parse_daytona_from_content(allocator: std.mem.Allocator, content: []const u8) !DaytonaEnvConfig {
     var api_key_raw: ?[]const u8 = null;
     var api_url_raw: ?[]const u8 = null;

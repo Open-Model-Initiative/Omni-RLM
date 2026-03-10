@@ -7,6 +7,7 @@
 //!
 //! - `RLM` - The main orchestrator for recursive LLM completions
 //! - `RLMLogger` - Structured JSON logging for RLM iterations
+//! - `config_env` - Environment configuration loader for .env files
 //!
 //! ## Example Usage
 //!
