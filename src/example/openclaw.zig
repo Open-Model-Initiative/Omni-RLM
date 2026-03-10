@@ -55,11 +55,7 @@ pub fn main() !void {
 
     var rlm: RLM = .{
         .backend = "openai",
-        .backend_kwargs = .{
-            .base_url = backend_cfg.base_url,
-            .api_key = backend_cfg.api_key,
-            .model_name = backend_cfg.model_name,
-        },
+        .backend_kwargs = backend_cfg,
         .environment = "local",
         .environment_kwargs = "{}",
         .max_depth = 2,

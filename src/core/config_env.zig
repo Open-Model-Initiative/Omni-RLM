@@ -1,16 +1,5 @@
 const std = @import("std");
-
-pub const BackendEnvConfig = struct {
-    api_key: []const u8,
-    base_url: []const u8,
-    model_name: []const u8,
-
-    pub fn deinit(self: *BackendEnvConfig, allocator: std.mem.Allocator) void {
-        allocator.free(self.api_key);
-        allocator.free(self.base_url);
-        allocator.free(self.model_name);
-    }
-};
+const backendKwargs = @import("types.zig").backendKwargs;
 
 pub const DaytonaEnvConfig = struct {
     api_key: []const u8,
@@ -46,7 +35,7 @@ fn resolve_env_value(allocator: std.mem.Allocator, value: []const u8) ![]const u
     return allocator.dupe(u8, value);
 }
 
-fn parse_backend_from_content(allocator: std.mem.Allocator, content: []const u8) !BackendEnvConfig {
+fn parse_backend_from_content(allocator: std.mem.Allocator, content: []const u8) !backendKwargs {
     var api_key_raw: ?[]const u8 = null;
     var base_url_raw: ?[]const u8 = null;
     var model_name_raw: ?[]const u8 = null;
@@ -130,8 +119,11 @@ fn parse_daytona_from_content(allocator: std.mem.Allocator, content: []const u8)
 /// - OMNIRLM_API_KEY (or DASHSCOPE_API_KEY / OPENAI_API_KEY)
 /// - OMNIRLM_BASE_URL
 /// - OMNIRLM_MODEL_NAME
-pub fn load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u8) !BackendEnvConfig {
-    const content = try std.fs.cwd().readFileAlloc(allocator, env_path, 1024 * 1024);
+pub fn load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u8) !backendKwargs {
+    const content = std.fs.cwd().readFileAlloc(allocator, env_path, 1024 * 1024) catch {
+        std.debug.print("Failed to load backend config from .env. Required keys: OMNIRLM_API_KEY (or DASHSCOPE_API_KEY/OPENAI_API_KEY), OMNIRLM_BASE_URL, OMNIRLM_MODEL_NAME.\n", .{});
+        return error.MissingBackendConfig;
+    };
     defer allocator.free(content);
 
     return parse_backend_from_content(allocator, content);
@@ -145,7 +137,10 @@ pub fn load_backend_env_config(allocator: std.mem.Allocator, env_path: []const u
 /// Optional keys:
 /// - DAYTONA_API_URL (or OMNIRLM_DAYTONA_API_URL), defaults to https://app.daytona.io/api
 pub fn load_daytona_env_config(allocator: std.mem.Allocator, env_path: []const u8) !DaytonaEnvConfig {
-    const content = try std.fs.cwd().readFileAlloc(allocator, env_path, 1024 * 1024);
+    const content = std.fs.cwd().readFileAlloc(allocator, env_path, 1024 * 1024) catch {
+        std.debug.print("Failed to load daytona config from .env. Required keys: DAYTONA_API_KEY (or OMNIRLM_DAYTONA_API_KEY).\n", .{});
+        return error.MissingDaytonaConfig;
+    };
     defer allocator.free(content);
 
     return parse_daytona_from_content(allocator, content);

@@ -14,6 +14,12 @@ pub const backendKwargs = struct {
     api_key: []const u8,
     base_url: []const u8,
     model_name: []const u8,
+    pub fn deinit(self: *backendKwargs, allocator: std.mem.Allocator) void {
+        allocator.free(self.api_key);
+        allocator.free(self.base_url);
+        allocator.free(self.model_name);
+        self.* = undefined;
+    }
 };
 
 /// Metadata for RLM execution session

@@ -5,9 +5,8 @@ const config_env = @import("omni-rlm").config_env;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    var backend_cfg = config_env.load_backend_env_config(allocator, ".env") catch {
-        std.debug.print("Failed to load backend config from .env. Required keys: OMNIRLM_API_KEY (or DASHSCOPE_API_KEY/OPENAI_API_KEY), OMNIRLM_BASE_URL, OMNIRLM_MODEL_NAME.\n", .{});
-        return error.MissingBackendConfig;
+    var backend_cfg = config_env.load_backend_env_config(allocator, ".env") catch |err| {
+        return err;
     };
     defer backend_cfg.deinit(allocator);
 
@@ -18,11 +17,7 @@ pub fn main() !void {
     var rlm: RLM =
         .{
             .backend = "openai",
-            .backend_kwargs = .{
-                .base_url = backend_cfg.base_url,
-                .api_key = backend_cfg.api_key,
-                .model_name = backend_cfg.model_name,
-            },
+            .backend_kwargs = backend_cfg,
             .environment = "local",
             .environment_kwargs = "{}",
             .max_depth = 1,

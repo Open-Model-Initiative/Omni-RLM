@@ -165,7 +165,6 @@ pub const RLM = struct {
 
         // Make final request to get default answer
         const response = try lm_handler.make_request(complete_messages.items, allocator);
-        std.debug.print("This is response {s}\n", .{response});
         const timeend = std.time.milliTimestamp();
 
         return RLMChatCompletion{
