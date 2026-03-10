@@ -33,7 +33,7 @@ pub fn main() !void {
 
     try rlm.init();
     defer rlm.deinit();
-    const prompt = "Print me the first 100 powers of two, each on a newline.";
+    const prompt = "read the README.md file at current directory and summarize it in 3 sentences.";
     const p = try allocator.dupe(u8, prompt);
     defer allocator.free(p);
     std.debug.print("INPUT:{s}", .{prompt});

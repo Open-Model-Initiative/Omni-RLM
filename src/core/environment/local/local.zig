@@ -1,7 +1,8 @@
 const std = @import("std");
 
 const local_init_script =
-    \\import dill, sys
+    \\import dill, sys, dotenv
+    \\dotenv.load_dotenv()
     \\def FINAL_VAR(name):
     \\    variable_name = name.strip().strip("\"'")
     \\    if variable_name in globals():
@@ -10,6 +11,15 @@ const local_init_script =
     \\def FINAL(name):
     \\    """Return the value as a final answer."""
     \\    return str(name)
+    \\def llm_query(prompt):
+    \\    from openai import OpenAI
+    \\    api_key = os.getenv("OMNIRLM_API_KEY")
+    \\    client = OpenAI(api_key=api_key, base_url=os.getenv("OMNIRLM_BASE_URL"))
+    \\    response = client.chat.completions.create(
+    \\        model=os.getenv("OMNIRLM_MODEL_NAME"),
+    \\        messages=[{"role": "system", "content": "You are a helpful assistant."},{"role": "user", "content": prompt}],
+    \\    )
+    \\    return response.choices[0].message.content or ""
     \\code = sys.argv[1]
     \\context = sys.argv[2] if len(sys.argv) > 2 else ""
     \\try:

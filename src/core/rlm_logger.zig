@@ -177,7 +177,7 @@ pub const RLMLogger = struct {
         try entry.value.object.put("iteration", std.json.Value{ .integer = @intCast(self.iteration_count) });
         try entry.value.object.put("timestamp", std.json.Value{ .string = timestamp_str });
 
-        const json_iteration = std.json.fmt(entry.value, .{});
+        const json_iteration = std.json.fmt(entry.value, .{ .whitespace = .indent_4 });
         const str = try std.fmt.allocPrint(allocator, "{f}", .{json_iteration});
         defer allocator.free(str);
         try self.log(str);
@@ -223,7 +223,7 @@ pub const RLMLogger = struct {
             _ = backend_kwargs.object.swapRemove("api_key");
         }
 
-        const json_metadata = std.json.fmt(entry.value, .{});
+        const json_metadata = std.json.fmt(entry.value, .{ .whitespace = .indent_4 });
         const str = try std.fmt.allocPrint(allocator, "{f}", .{json_metadata});
         defer allocator.free(str);
         try self.log(str);

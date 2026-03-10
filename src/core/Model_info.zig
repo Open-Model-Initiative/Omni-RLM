@@ -46,7 +46,9 @@ pub const ModelHandler = struct {
     /// - Response parsing fails
     /// - Expected fields are missing from response
     pub fn make_request(self: @This(), messages: []Message, allocator: std.mem.Allocator) ![]u8 {
-        const endpoint = try std.Uri.parse(self.base_url);
+        const url = try std.fmt.allocPrint(allocator, "{s}/chat/completions", .{self.base_url});
+        defer allocator.free(url);
+        const endpoint = try std.Uri.parse(url);
         var client: Client = .{ .allocator = allocator };
         defer client.deinit();
 

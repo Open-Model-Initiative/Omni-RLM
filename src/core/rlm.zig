@@ -159,21 +159,19 @@ pub const RLM = struct {
 
         // Append final prompt
         try complete_messages.append(allocator, Message{
-            .role = "user",
+            .role = "assistant",
             .content = "Please provide a final answer to the user's question based on the information provided.",
         });
 
         // Make final request to get default answer
         const response = try lm_handler.make_request(complete_messages.items, allocator);
-        defer allocator.free(response);
-
+        std.debug.print("This is response {s}\n", .{response});
         const timeend = std.time.milliTimestamp();
 
-        const final_response = try allocator.dupe(u8, response);
         return RLMChatCompletion{
             .root_model = lm_handler.model_name,
             .prompt = prompt,
-            .response = final_response,
+            .response = response,
             .execution_time = timeend - timestart,
         };
     }
