@@ -104,7 +104,7 @@ pub const RLM = struct {
     }
 
     /// Set up the system prompt for the completion
-    fn setup_prompt(self: *RLM, prompt: []u8, allocator: std.mem.Allocator) !std.ArrayList(Message) {
+    fn setup_prompt(self: *RLM, prompt: []const u8, allocator: std.mem.Allocator) !std.ArrayList(Message) {
         // Implementation for setting up the prompt
         var metadata: QueryMetadata = QueryMetadata.init(prompt, allocator);
         defer metadata.deinit(allocator);
@@ -119,7 +119,7 @@ pub const RLM = struct {
     /// Fallback answer when max depth is reached
     ///
     /// Makes a simple direct request to the model without the REPL system prompt.
-    fn fallback_answer(self: *RLM, prompt: []u8, lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
+    fn fallback_answer(self: *RLM, prompt: []const u8, lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
         // Simple single iteration: ask and get final answer without system prompt setup
         _ = self;
         const timestart = std.time.milliTimestamp();
@@ -146,7 +146,7 @@ pub const RLM = struct {
     }
 
     /// Default answer when max iterations reached without finding a final answer
-    fn default_answer(self: *RLM, prompt: []u8, message_history: std.ArrayList(Message), lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
+    fn default_answer(self: *RLM, prompt: []const u8, message_history: std.ArrayList(Message), lm_handler: ModelHandler, allocator: std.mem.Allocator) !RLMChatCompletion {
         _ = self;
         // Generate a final answer when max iterations reached without finding a final answer
         const timestart = std.time.milliTimestamp();
@@ -199,7 +199,7 @@ pub const RLM = struct {
     /// defer allocator.free(result.response);
     /// std.debug.print("Answer: {s}\n", .{result.response});
     /// ```
-    pub fn completion(self: *RLM, prompt: []u8, root_prompt: ?[]u8) !RLMChatCompletion {
+    pub fn completion(self: *RLM, prompt: []const u8, root_prompt: ?[]const u8) !RLMChatCompletion {
         // Implementation for completion logic goes here
         const allocator = self.allocator;
         const timestart = std.time.milliTimestamp();
