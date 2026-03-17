@@ -343,24 +343,39 @@ Handles direct HTTP communication with OpenAI-compatible API endpoints. Low-leve
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `base_url` | `[]const u8` | `"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"` | API endpoint URL for chat completions |
-| `api_key` | `[]const u8` | `""` | Authentication value for the API |
-| `model_name` | `[]const u8` | `"qwen-plus"` | Name of the model to use |
+| `base_url` | `[]const u8` | - | API base URL or full chat completion URL |
+| `api_key` | `[]const u8` | - | Authentication value for the API |
+| `model_name` | `[]const u8` | - | Name of the model to use |
+
+#### `RequestConfig` - Request Runtime Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `stream` | `bool` | `false` | Enables server-sent-event style streaming responses |
+| `enable_thinking` | `bool` | `false` | Prints `reasoning_content` (when provided by backend) before answer content |
 
 #### Methods
 
-##### `make_request(self: @This(), messages: []Message, allocator: std.mem.Allocator) ![]u8`
+##### `make_request(self: @This(), messages: std.ArrayList(Message), allocator: std.mem.Allocator, config: RequestConfig) ![]u8`
 
 Sends a chat completion request to the configured API endpoint.
 
 **Parameters:**
 
-- `messages`: Array of `Message` structs forming the conversation
+- `messages`: `std.ArrayList(Message)` conversation payload (request body uses `messages.items`)
 - `allocator`: Memory allocator
+- `config`: Runtime flags for streaming and thinking output
 
 **Returns:** Response text from the model as a string (caller owns memory)
 
-**Errors:** Returns error if HTTP request fails, response parsing fails, or expected fields are missing from response
+**Behavior:**
+
+- If `base_url` does not end with `/chat/completions`, the suffix is appended automatically.
+- If `api_key` does not start with `Bearer `, the prefix is added automatically.
+- When `config.stream = true`, streamed deltas are parsed from `data: ...` lines and concatenated into the returned answer.
+- When `config.enable_thinking = true`, `reasoning_content` is printed to stdout, but only `content` is returned.
+
+**Errors:** Returns errors for request/transport failures (`error.HttpRequestFailed`) and invalid non-stream JSON responses (`error.InvalidResponse`).
 
 ### `RLM` - Main Orchestrator
 
@@ -406,6 +421,7 @@ Generates a completion based on input text.
 
 - Builds the system prompt using `QueryMetadata` and `buildSystemPrompt`.
 - Iteratively calls the backend, extracts ```repl``` code blocks, and executes them.
+- Iterative calls use streaming mode (`stream = true`) and disable thinking output (`enable_thinking = false`).
 - Uses `EnvHandler.find_final_answer` to detect `FINAL(...)` or `FINAL_VAR(...)`.
 - If `max_depth` is exceeded, falls back to a single direct call.
 - If no final answer is found by `max_iterations`, requests a default final answer.

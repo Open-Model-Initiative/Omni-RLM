@@ -130,7 +130,7 @@ pub const RLM = struct {
         try simple_message.append(allocator, Message{ .role = "user", .content = prompt });
 
         // Make a direct request to the model
-        const response = try lm_handler.make_request(simple_message.items, allocator);
+        const response = try lm_handler.make_request(simple_message, allocator, .{});
         defer allocator.free(response);
 
         const timeend = std.time.milliTimestamp();
@@ -164,7 +164,7 @@ pub const RLM = struct {
         });
 
         // Make final request to get default answer
-        const response = try lm_handler.make_request(complete_messages.items, allocator);
+        const response = try lm_handler.make_request(complete_messages, allocator, .{});
         const timeend = std.time.milliTimestamp();
 
         return RLMChatCompletion{
@@ -246,6 +246,8 @@ pub const RLM = struct {
             // Append user prompt
             try current_prompt.appendSlice(allocator, user_prompt.items);
 
+            std.debug.print("\n========== ITERATION {d} ==========\n", .{i});
+
             var iteration: RLMIteration = try self.completion_turn(current_prompt, lm_handler, env, allocator);
             defer {
                 allocator.free(iteration.response);
@@ -256,9 +258,7 @@ pub const RLM = struct {
             }
 
             // Print iteration summary with response
-            std.debug.print("\n========== ITERATION {d} ==========\n", .{i});
-            std.debug.print("Response:\n{s}\n", .{iteration.response});
-            std.debug.print("Execution Time: {d}ms\n", .{iteration.iteration_time});
+            std.debug.print("\nExecution Time: {d}ms\n", .{iteration.iteration_time});
             std.debug.print("===============================\n\n", .{});
 
             const final_answer = try env.find_final_answer(iteration.response, allocator);
@@ -293,7 +293,10 @@ pub const RLM = struct {
     fn completion_turn(self: *RLM, prompt: std.ArrayList(Message), lm_handler: ModelHandler, env: environment.EnvHandler, allocator: std.mem.Allocator) !RLMIteration {
         _ = self; // to avoid unused variable warning
         const iter_start = std.time.milliTimestamp();
-        const response = try lm_handler.make_request(prompt.items, allocator);
+        const response = try lm_handler.make_request(prompt, allocator, .{
+            .stream = true,
+            .enable_thinking = false,
+        });
         // TODO: only support python code execution now, need to support bash code execution as well.
         var code_block_strs = try find_code_blocks(response, allocator);
         defer code_block_strs.deinit(allocator);
