@@ -40,19 +40,14 @@ pub const ModelHandler = struct {
     };
 
     fn printAll(text: []const u8) !void {
-        const stdout = std.fs.File.stdout();
-        const view = std.unicode.Utf8View.init(text) catch {
-            for (text) |byte| {
-                try stdout.writeAll(&[_]u8{byte});
-                std.Thread.sleep(5 * std.time.ns_per_ms);
-            }
-            return;
-        };
-        var it = view.iterator();
-        while (it.nextCodepointSlice()) |cp_slice| {
-            try stdout.writeAll(cp_slice);
-            std.Thread.sleep(5 * std.time.ns_per_ms);
-        }
+        const cwd = std.fs.cwd();
+        try cwd.makePath("logs");
+
+        var log_file = try cwd.createFile("logs/model_stream_output.log", .{ .truncate = false });
+        defer log_file.close();
+
+        try log_file.seekFromEnd(0);
+        try log_file.writeAll(text);
     }
 
     fn printThinkingHeader(state: *StreamState) !void {
