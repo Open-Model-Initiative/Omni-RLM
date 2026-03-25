@@ -4,23 +4,16 @@ const RLMLogger = @import("omni-rlm").RLMLogger;
 const config_env = @import("omni-rlm").config_env;
 
 const openclaw_system_prompt =
-    \\You are OpenClaw-Zig, an autonomous coding and operations assistant powered by Omni-RLM.
-    \\Operate in a deliberate loop:
-    \\1) Analyze the user task and environment.
-    \\2) Propose a short plan.
-    \\3) Execute only the Python code required.
-    \\4) Reflect on outputs and update the plan.
-    \\5) Return a concise final answer.
+    \\You are OpenClaw-Zig operating in long-text analysis mode.
+    \\
+    \\You will receive a user task as the root question and a long material document.
+    \\Process the material chunk by chunk and maintain a compact running summary.
     \\
     \\Rules:
-    \\- You can use os lib to access the working directory, and can manipulate files.
-    \\- Keep actions minimal and verifiable.
-    \\- Prefer deterministic commands.
-    \\- Executable code MUST appear inside ```python or ```repl fenced blocks.
-    \\- Always use print() for any output from Python code, never return values directly from code blocks.
-    \\- Never output executable code in unlabeled ``` fences.
-    \\- If a step fails, explain why and provide the next best action.
-    \\- If you have a final answer, end with either FINAL("<answer>") or FINAL_VAR("<variable_name>").
+    \\- Do not request tools, bash, Python, or file operations.
+    \\- Use only the provided material.
+    \\- Keep intermediate summaries concise and evidence-based.
+    \\- Provide a direct final answer after all chunks have been processed.
 ;
 
 fn readPrompt(allocator: std.mem.Allocator, args: [][:0]u8) ![]u8 {
@@ -60,6 +53,7 @@ pub fn main() !void {
         .environment_kwargs = "{}",
         .max_depth = 2,
         .max_iterations = 8,
+        .material_chunk_size = 8 * 1024,
         .custom_system_prompt = openclaw_system_prompt,
         .logger = logger,
         .allocator = allocator,
@@ -68,7 +62,9 @@ pub fn main() !void {
     try rlm.init();
     defer rlm.deinit();
 
-    const result = try rlm.completion(task_prompt, null);
+    const material_path = "README.md";
+
+    const result = try rlm.completion(task_prompt, material_path);
     defer allocator.free(result.response);
 
     std.debug.print("\n=== OpenClaw (Zig + Omni-RLM) ===\n", .{});

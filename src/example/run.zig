@@ -21,6 +21,7 @@ pub fn main() !void {
             .environment = "local",
             .environment_kwargs = "{}",
             .max_depth = 1,
+            .material_chunk_size = 8 * 1024,
             .logger = logger,
             .allocator = allocator,
             .max_iterations = 5,
@@ -28,13 +29,16 @@ pub fn main() !void {
 
     try rlm.init();
     defer rlm.deinit();
-    const prompt = "read the README.md file at current directory and summarize it in 3 sentences.";
-    const p = try allocator.dupe(u8, prompt);
-    defer allocator.free(p);
-    std.debug.print("INPUT:{s}", .{prompt});
-    const result = try rlm.completion(p, null);
+    const root =
+        "Based on this API reference, return a minimal directly executable Zig example showing how to call " ++
+        "completion.";
+    const material_path = "API_reference.md";
+
+    std.debug.print("INPUT:{s}\n", .{root});
+    const result = try rlm.completion(root, material_path);
     defer allocator.free(result.response);
     std.debug.print("total time: {d}ms\n", .{result.execution_time});
+    std.debug.print("Answer:\n{s}\n", .{result.response});
 
     std.debug.print("\n*******RLM finished*******\n", .{});
 }

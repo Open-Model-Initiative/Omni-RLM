@@ -83,6 +83,27 @@ pub const QueryMetadata = struct {
         };
     }
 
+    /// Initialize QueryMetadata for chunked long-form material.
+    pub fn initChunked(material: []const u8, chunk_size: usize, allocator: std.mem.Allocator) !QueryMetadata {
+        const safe_chunk_size = @max(chunk_size, 1);
+        const chunk_count = if (material.len == 0) 1 else std.math.divCeil(usize, material.len, safe_chunk_size) catch unreachable;
+        const context_length = try allocator.alloc(u32, chunk_count);
+
+        var offset: usize = 0;
+        for (0..chunk_count) |index| {
+            const remaining = material.len -| offset;
+            const current_chunk_len = if (remaining == 0) 0 else @min(safe_chunk_size, remaining);
+            context_length[index] = @intCast(current_chunk_len);
+            offset += current_chunk_len;
+        }
+
+        return QueryMetadata{
+            .context_length = context_length,
+            .context_total_length = @intCast(material.len),
+            .context_type = "chunked_str",
+        };
+    }
+
     /// Deinitialize QueryMetadata
     ///
     /// Frees allocated memory for context lengths
@@ -95,16 +116,18 @@ pub const QueryMetadata = struct {
     }
 };
 
-/// Represents a single iteration in the RLM completion loop
+/// Represents a single iteration in the long-text completion loop.
 ///
 /// Captures all information about one model request/response cycle,
-/// including the prompt, response, executed code blocks, and timing
+/// including the prompt, updated running summary, chunk metadata, and timing.
 ///
 /// ## Fields
 /// - `prompt`: Array of messages sent to the model
 /// - `response`: Raw text response from the model
-/// - `code_blocks`: Array of code blocks extracted and executed
-/// - `final_answer`: Optional final answer if found in this iteration
+/// - `chunk_index`: Index of the processed material chunk
+/// - `total_chunks`: Total number of material chunks
+/// - `chunk_length`: Character length of the processed chunk
+/// - `running_summary`: Updated cumulative summary after this chunk
 /// - `iteration_time`: Time taken for this iteration in milliseconds
 ///
 /// ## Example
@@ -112,49 +135,22 @@ pub const QueryMetadata = struct {
 /// var iteration = RLMIteration{
 ///     .prompt = messages,
 ///     .response = response_text,
-///     .code_blocks = code_blocks,
+///     .chunk_index = 0,
+///     .total_chunks = 8,
+///     .chunk_length = 4096,
+///     .running_summary = response_text,
 ///     .iteration_time = 1000,
 /// };
 /// ```
 pub const RLMIteration = struct {
     prompt: std.ArrayList(Message),
-    ///repl like response from LM
+    /// Incremental synthesis response from the model.
     response: []const u8,
-    code_blocks: []CodeBlock,
-    final_answer: ?[]const u8 = null,
+    chunk_index: u32,
+    total_chunks: u32,
+    chunk_length: u32,
+    running_summary: []const u8,
     iteration_time: i64,
-
-    /// Format iteration results as messages for the next turn
-    ///
-    /// Converts the model response and code execution results into
-    /// a message array suitable for appending to conversation history
-    ///
-    /// ## Parameters
-    /// - `allocator`: Memory allocator for allocations
-    ///
-    /// ## Returns
-    /// ArrayList of Message structs representing this iteration
-    pub fn format_iteration(self: *RLMIteration, allocator: std.mem.Allocator) !std.ArrayList(Message) {
-        var messages: std.ArrayList(Message) = .empty;
-        try messages.append(allocator, Message{
-            .role = "assistant",
-            .content = try allocator.dupe(u8, self.response),
-        });
-        for (0..self.code_blocks.len) |index| {
-            const code = self.code_blocks[index].code;
-            const result = try std.fmt.allocPrint(
-                allocator,
-                "STDOUT:\n{s}\n\nSTDERR:\n{s}\n\n",
-                .{ self.code_blocks[index].result.stdout, self.code_blocks[index].result.stderr },
-            );
-            defer allocator.free(result);
-            try messages.append(allocator, Message{
-                .role = "user",
-                .content = try std.fmt.allocPrint(allocator, "Code executed:\n```python\n{s}\n```\nREPL output::\n{s}", .{ code, result }),
-            });
-        }
-        return messages;
-    }
 };
 
 /// Result of an RLM chat completion
@@ -172,40 +168,6 @@ pub const RLMChatCompletion = struct {
     response: []const u8,
     // usage_sumary: []const u8,//TODO implement usage summary
     execution_time: i64,
-};
-
-/// A code block with its execution result
-///
-/// Represents a single extracted code block and the result of its execution
-///
-/// ## Fields
-/// - `code`: The source code that was executed
-/// - `result`: Process execution result containing stdout, stderr, and exit status
-///
-/// ## Example
-/// ```zig
-/// var block = CodeBlock{
-///     .code = "print('hello')",
-///     .result = run_result,
-/// };
-/// defer block.deinit(allocator);
-/// ```
-pub const CodeBlock = struct {
-    code: []const u8,
-    result: std.process.Child.RunResult, // TODO change the struct support locals, execution_time, rlm_calls.
-
-    /// Deinitialize CodeBlock
-    ///
-    /// Frees all allocated memory for code and execution results
-    ///
-    /// ## Parameters
-    /// - `allocator`: Memory allocator used for allocations
-    pub fn deinit(self: *CodeBlock, allocator: std.mem.Allocator) void {
-        allocator.free(self.code);
-        allocator.free(self.result.stderr);
-        allocator.free(self.result.stdout);
-        self.* = undefined;
-    }
 };
 
 /// A chat message for LLM APIs

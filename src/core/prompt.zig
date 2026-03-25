@@ -1,262 +1,168 @@
 const std = @import("std");
-const json = std.json;
 const QueryMetadata = @import("types.zig").QueryMetadata;
 const Message = @import("types.zig").Message;
 
-/// System prompt for the REPL environment with explicit final answer checking
-///
-/// This is the default system prompt that guides the LLM in using the REPL environment
-/// for recursive problem-solving. It instructs the model on:
-/// - Accessing and analyzing context data
-/// - Using the `llm_query` and `llm_query_batched` functions
-/// - Chunking strategies for large contexts
-/// - Providing final answers with FINAL() or FINAL_VAR()
+/// System prompt for long-text incremental synthesis.
 pub const RLM_SYSTEM_PROMPT: []const u8 =
-    \\You are tasked with answering a query with associated context. You can access, transform, and analyze this context interactively in a REPL environment that can recursively query sub-LLMs, which you are strongly encouraged to use as much as possible. You will be queried iteratively until you provide a final answer.
+    \\You answer a root question by reading a very long material incrementally.
     \\
-    \\The REPL environment is initialized with:
-    \\1. A `context` variable that contains extremely important information about your query. You should check the content of the `context` variable to understand what you are working with. Make sure you look through it sufficiently as you answer your query.
-    \\2. A `llm_query` function that allows you to query an LLM (that can handle around 500K chars) inside your REPL environment.
-    \\3. A `llm_query_batched` function that allows you to query multiple prompts concurrently: `llm_query_batched(prompts: List[str]) -> List[str]`. This is much faster than sequential `llm_query` calls when you have multiple independent queries. Results are returned in the same order as the input prompts.
-    \\4. The ability to use `print()` statements to view the output of your REPL code and continue your reasoning.
+    \\You will receive one material chunk at a time plus a running summary from earlier chunks. Your job on each iteration is to update that running summary so it becomes a better evidence-backed answer to the root question.
     \\
-    \\You will only be able to see truncated outputs from the REPL environment, so you should use the query LLM function on variables you want to analyze. You will find this function especially useful when you have to analyze the semantics of the context. Use these variables as buffers to build up your final answer.
-    \\Make sure to explicitly look through the entire context in REPL before answering your query. An example strategy is to first look at the context and figure out a chunking strategy, then break up the context into smart chunks, and query an LLM per chunk with a particular question and save the answers to a buffer, then query an LLM with all the buffers to produce your final answer.
+    \\Rules:
+    \\- Use only the current chunk and the prior running summary.
+    \\- Keep the running summary compact, factual, and cumulative.
+    \\- Preserve uncertainty when the chunk is inconclusive.
+    \\- Prefer quoting or paraphrasing concrete evidence from the chunk over speculation.
+    \\- Do not produce the final user-facing answer during chunk processing unless explicitly asked to finalize.
+    \\- If the root question requests executable code, do not add prose explanations around that final code unless the root question explicitly asks for explanation.
     \\
-    \\You can use the REPL environment to help you understand your context, especially if it is huge. Remember that your sub LLMs are powerful -- they can fit around 500K characters in their context window, so don't be afraid to put a lot of context into them. For example, a viable strategy is to feed 10 documents per sub-LLM query. Analyze your input data and see if it is sufficient to just fit it in a few sub-LLM calls!
-    \\
-    \\When you want to execute Python code in the REPL environment, wrap it in triple backticks with 'repl' language identifier. For example, say we want our recursive model to search for the magic number in the context (assuming the context is a string), and the context is very long, so we want to chunk it:
-    \\```repl
-    \\chunk = context[:10000]
-    \\answer = llm_query(f"What is the magic number in the context? Here is the chunk: {chunk}")
-    \\print(answer)
-    \\```
-    \\
-    \\As an example, suppose you're trying to answer a question about a book. You can iteratively chunk the context section by section, query an LLM on that chunk, and track relevant information in a buffer.
-    \\```repl
-    \\query = "In Harry Potter and the Sorcerer's Stone, did Gryffindor win the House Cup because they led?"
-    \\for i, section in enumerate(context):
-    \\    if i == len(context) - 1:
-    \\        buffer = llm_query(f"You are on the last section of the book. So far you know that: {buffers}. Gather from this last section to answer {query}. Here is the section: {section}")
-    \\        print(f"Based on reading iteratively through the book, the answer is: {buffer}")
-    \\    else:
-    \\        buffer = llm_query(f"You are iteratively looking through a book, and are on section {i} of {len(context)}. Gather information to help answer {query}. Here is the section: {section}")
-    \\        print(f"After section {i} of {len(context)}, you have tracked: {buffer}")
-    \\```
-    \\
-    \\As another example, when the context isn't that long (e.g. >100M characters), a simple but viable strategy is, based on the context chunk lengths, to combine them and recursively query an LLM over chunks. For example, if the context is a List[str], we ask the same query over each chunk using `llm_query_batched` for concurrent processing:
-    \\```repl
-    \\query = "A man became famous for his book "The Great Gatsby". How many jobs did he have?"
-    \\# Suppose our context is ~1M chars, and we want each sub-LLM query to be ~0.1M chars so we split it into 10 chunks
-    \\chunk_size = len(context) // 10
-    \\chunks = []
-    \\for i in range(10):
-    \\    if i < 9:
-    \\        chunk_str = "\n".join(context[i*chunk_size:(i+1)*chunk_size])
-    \\    else:
-    \\        chunk_str = "\n".join(context[i*chunk_size:])
-    \\    chunks.append(chunk_str)
-    \\
-    \\# Use batched query for concurrent processing - much faster than sequential calls!
-    \\prompts = [f"Try to answer the following query: {query}. Here are the documents:\n{chunk}. Only answer if you are confident in your answer based on the evidence." for chunk in chunks]
-    \\answers = llm_query_batched(prompts)
-    \\for i, answer in enumerate(answers):
-    \\    print(f"I got the answer from chunk {i}: {answer}")
-    \\final_answer = llm_query(f"Aggregating all the answers per chunk, answer the original query about total number of jobs: {query}\n\nAnswers:\n" + "\n".join(answers))
-    \\```
-    \\
-    \\As a final example, after analyzing the context and realizing its separated by Markdown headers, we can maintain state through buffers by chunking the context by headers, and iteratively querying an LLM over it:
-    \\```repl
-    \\# After finding out the context is separated by Markdown headers, we can chunk, summarize, and answer
-    \\import re
-    \\sections = re.split(r'### (.+)', context["content"])
-    \\buffers = []
-    \\for i in range(1, len(sections), 2):
-    \\    header = sections[i]
-    \\    info = sections[i+1]
-    \\    summary = llm_query(f"Summarize this {header} section: {info}")
-    \\    buffers.append(f"{header}: {summary}")
-    \\final_answer = llm_query(f"Based on these summaries, answer the original query: {query}\n\nSummaries:\n" + "\n".join(buffers))
-    \\```
-    \\In the next step, we can return FINAL_VAR(final_answer).
-    \\
-    \\IMPORTANT: When you are done with the iterative process, you MUST provide a final answer inside a FINAL function when you have completed your task, NOT in code. Do not use these tags unless you have completed your task. You have two options:
-    \\1. Use FINAL(your final answer here) to provide the answer directly
-    \\2. Use FINAL_VAR(variable_name) to return a variable you have created in the REPL environment as your final output
-    \\
-    \\Think step by step carefully, plan, and execute this plan immediately in your response -- do not just say "I will do this" or "I will do that". Output to the REPL environment and recursive LLMs as much as possible. Remember to explicitly answer the original query in your final answer.
+    \\When processing a chunk, return an updated running summary only.
+    \\When finalizing, follow the requested output format using the accumulated summary. This may be a direct answer or executable code depending on the task.
+    \\If the root question asks for code only, return bare code without Markdown fences.
 ;
 
-/// Default user prompt template
-///
-/// Basic user prompt for guiding the model's next action in the REPL environment
-pub const USER_PROMPT: []const u8 =
-    \\Think step-by-step on what to do using the REPL environment (which contains the context) to answer the prompt.
-    \\
-    \\Continue using the REPL environment, which has the `context` variable, and querying sub-LLMs by writing to ```repl``` tags, and determine your answer. Your next action:
-;
-
-/// User prompt template with root prompt reference
-///
-/// Extended user prompt that includes the original/root prompt for context.
-/// Uses printf-style formatting with `{s}` placeholder for the root prompt.
-pub const USER_PROMPT_WITH_ROOT: []const u8 =
-    \\Think step-by-step on what to do using the REPL environment (which contains the context) to answer the original prompt: {s}.
-    \\
-    \\Continue using the REPL environment, which has the `context` variable, and querying sub-LLMs by writing to ```repl``` tags, and determine your answer. Your next action:
-;
-
-/// Build user prompt based on root_prompt and iteration number
-///
-/// Generates appropriate user prompt messages based on the iteration number
-/// and whether this is the initial prompt or a follow-up.
+/// Build the per-chunk prompt used for incremental synthesis.
 ///
 /// ## Parameters
 /// - `input_parameters`: Struct containing:
-///   - `root_prompt`: Optional original/root prompt for context
-///   - `iteration`: Current iteration number (0-indexed)
-///   - `context_count`: Number of context segments available (default: 1)
-///   - `history_count`: Number of prior conversation histories (default: 0)
+///   - `root_prompt`: The question to answer
+///   - `chunk`: Current chunk of material
+///   - `chunk_index`: Current chunk index (0-indexed)
+///   - `total_chunks`: Total number of chunks
+///   - `running_summary`: Summary accumulated so far
 /// - `allocator`: Memory allocator for allocations
 ///
 /// ## Returns
 /// ArrayList of Message structs containing the user prompt
-///
-/// ## Example
-/// ```zig
-/// var messages = try buildUserPrompt(.{
-///     .root_prompt = "What is the capital of France?",
-///     .iteration = 0,
-/// }, allocator);
-/// defer messages.deinit(allocator);
-/// defer ReleaseMessageArray(messages, allocator);
-/// ```
 pub fn buildUserPrompt(
     input_parameters: struct {
-        root_prompt: ?[]const u8 = null,
-        iteration: u32 = 0,
-        context_count: u32 = 1,
-        history_count: u32 = 0,
+        root_prompt: []const u8,
+        chunk: []const u8,
+        chunk_index: u32,
+        total_chunks: u32,
+        running_summary: ?[]const u8 = null,
     },
     allocator: std.mem.Allocator,
 ) !std.ArrayList(Message) {
-    const root_prompt = input_parameters.root_prompt;
-    const iteration = input_parameters.iteration;
-    const context_count = input_parameters.context_count;
-    const history_count = input_parameters.history_count;
-    var prompt: []const u8 = undefined;
-
-    if (iteration == 0) {
-        const safeguard = "You have not interacted with the REPL environment or seen your prompt / context yet. Your next action should be to look through and figure out how to answer the prompt, so don't just provide a final answer yet.\n\n";
-        if (root_prompt) |rp| {
-            const plug_in_root_prompt = try std.fmt.allocPrint(
-                allocator,
-                USER_PROMPT_WITH_ROOT,
-                .{rp},
-            );
-            defer allocator.free(plug_in_root_prompt);
-            prompt = try std.fmt.allocPrint(
-                allocator,
-                "{s}{s}",
-                .{ safeguard, plug_in_root_prompt },
-            );
-        } else {
-            prompt = try std.fmt.allocPrint(
-                allocator,
-                "{s}{s}",
-                .{ safeguard, USER_PROMPT },
-            );
-        }
-    } else {
-        prompt = try std.fmt.allocPrint(
-            allocator,
-            "{s}{s}",
-            .{ "The history before is your previous interactions with the REPL environment. ", USER_PROMPT },
-        );
-    }
-
-    if (context_count > 1) {
-        const Note = try std.fmt.allocPrint(
-            allocator,
-            "\n\nNote: You have {d} contexts available (context_0 through context_{d}).",
-            .{ context_count, context_count - 1 },
-        );
-        defer allocator.free(Note);
-        const new_prompt = std.mem.concat(allocator, u8, &.{ prompt, Note }) catch unreachable;
-        allocator.free(prompt);
-        prompt = new_prompt;
-    }
-
-    if (history_count > 0) {
-        var Note: []u8 = undefined;
-        if (history_count == 1) {
-            Note = try std.fmt.allocPrint(
-                allocator,
-                "\n\nNote: You have 1 prior conversation history available in the `history` variable.",
-                .{},
-            );
-        } else {
-            Note = try std.fmt.allocPrint(
-                allocator,
-                "\n\nNote: You have {d} prior conversation histories available (history_0 through history_{d}).",
-                .{ history_count, history_count - 1 },
-            );
-        }
-        defer allocator.free(Note);
-        const new_prompt = std.mem.concat(allocator, u8, &.{ prompt, Note }) catch unreachable;
-        allocator.free(prompt);
-        prompt = new_prompt;
-    }
+    const running_summary = input_parameters.running_summary orelse "(no relevant evidence found yet)";
+    const summary_prompt = try std.fmt.allocPrint(
+        allocator,
+        \\Running summary so far:
+        \\{s}
+    ,
+        .{running_summary},
+    );
+    const chunk_prompt = try std.fmt.allocPrint(
+        allocator,
+        \\Material chunk {d}/{d}:
+        \\{s}
+    ,
+        .{ input_parameters.chunk_index + 1, input_parameters.total_chunks, input_parameters.chunk },
+    );
+    const task_prompt = try allocator.dupe(u8,
+        \\Task:
+        \\Update the running summary using only the material chunk above.
+        \\- Keep it concise and cumulative.
+        \\- Keep only details that help answer the root question.
+        \\- If the chunk adds nothing useful, return the prior summary with a short note that this chunk was not relevant.
+        \\- Return plain text only.
+    );
 
     var result: std.ArrayList(Message) = .empty;
     try result.append(allocator, Message{
         .role = "user",
-        .content = prompt,
+        .content = try std.fmt.allocPrint(allocator, "Root question:\n{s}", .{input_parameters.root_prompt}),
+    });
+    try result.append(allocator, Message{
+        .role = "assistant",
+        .content = summary_prompt,
+    });
+    try result.append(allocator, Message{
+        .role = "user",
+        .content = chunk_prompt,
+    });
+    try result.append(allocator, Message{
+        .role = "user",
+        .content = task_prompt,
+    });
+    return result;
+}
+
+/// Build the final aggregation prompt.
+pub fn buildFinalPrompt(
+    root_prompt: []const u8,
+    running_summary: []const u8,
+    allocator: std.mem.Allocator,
+) !std.ArrayList(Message) {
+    const summary_prompt = try std.fmt.allocPrint(
+        allocator,
+        \\Accumulated evidence summary:
+        \\{s}
+    ,
+        .{running_summary},
+    );
+
+    var result: std.ArrayList(Message) = .empty;
+    try result.append(allocator, Message{
+        .role = "user",
+        .content = try std.fmt.allocPrint(allocator, "Root question:\n{s}", .{root_prompt}),
+    });
+    try result.append(allocator, Message{
+        .role = "assistant",
+        .content = summary_prompt,
+    });
+    try result.append(allocator, Message{
+        .role = "user",
+        .content = try allocator.dupe(u8,
+            \\Task:
+            \\Answer the root question using only the evidence summary above.
+            \\- Follow the format requested by the root question.
+            \\- If the root question asks for executable code, return only the code unless the question says otherwise.
+            \\- Do not wrap returned code in Markdown fences unless the root question explicitly asks for fenced code.
+            \\- Do not prepend or append explanatory text around returned code unless the root question explicitly asks for explanation.
+            \\- If the evidence is incomplete, say what is missing instead of inventing details.
+        ),
     });
     return result;
 }
 
 test "buildUserPrompt works" {
     const allocator = std.testing.allocator;
-    {
-        var prompt_no_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 0 }, allocator);
-        defer prompt_no_root.deinit(allocator);
-        defer ReleaseMessageArray(prompt_no_root, allocator);
-        const formatter = std.json.fmt(.{ .message = prompt_no_root }, .{});
-        std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 0)\n{f}\n", .{formatter});
-    }
-    {
-        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 0 }, allocator);
-        defer prompt_with_root.deinit(allocator);
-        defer ReleaseMessageArray(prompt_with_root, allocator);
-        const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
-        std.debug.print("\nTESTING:\nUser Prompt with root:\n{f}\n", .{formatter});
-    }
-    {
-        var prompt_without_root = try buildUserPrompt(.{ .root_prompt = null, .iteration = 1 }, allocator);
-        defer prompt_without_root.deinit(allocator);
-        defer ReleaseMessageArray(prompt_without_root, allocator);
-        const formatter = std.json.fmt(.{ .message = prompt_without_root }, .{});
-        std.debug.print("\nTESTING:\nUser Prompt without root:(iteration 1)\n{f}\n", .{formatter});
-    }
-    {
-        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .context_count = 2 }, allocator);
-        defer prompt_with_root.deinit(allocator);
-        defer ReleaseMessageArray(prompt_with_root, allocator);
-        const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
-        const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, context_count 2)\n{f}\n", .{formatter}) catch unreachable;
-        defer allocator.free(out_string);
-        try std.testing.expectStringEndsWith(out_string, "Note: You have 2 contexts available (context_0 through context_1).\"}],\"capacity\":4}}\n");
-    }
-    {
-        var prompt_with_root = try buildUserPrompt(.{ .root_prompt = "What is the capital of France?", .iteration = 1, .history_count = 1 }, allocator);
-        defer prompt_with_root.deinit(allocator);
-        defer ReleaseMessageArray(prompt_with_root, allocator);
-        const formatter = std.json.fmt(.{ .message = prompt_with_root }, .{});
-        const out_string = std.fmt.allocPrint(allocator, "\nTESTING:\nUser Prompt with root:(iteration 1, history_count 1)\n{f}\n", .{formatter}) catch unreachable;
-        defer allocator.free(out_string);
-        try std.testing.expectStringEndsWith(out_string, "Note: You have 1 prior conversation history available in the `history` variable.\"}],\"capacity\":4}}\n");
-    }
+    var prompt_with_root = try buildUserPrompt(.{
+        .root_prompt = "What is the capital of France?",
+        .chunk = "Paris is the capital city and largest urban area in France.",
+        .chunk_index = 0,
+        .total_chunks = 3,
+        .running_summary = null,
+    }, allocator);
+    defer prompt_with_root.deinit(allocator);
+    defer ReleaseMessageArray(prompt_with_root, allocator);
+
+    try std.testing.expectEqual(@as(usize, 4), prompt_with_root.items.len);
+    try std.testing.expect(std.mem.eql(u8, prompt_with_root.items[0].role, "user"));
+    try std.testing.expect(std.mem.eql(u8, prompt_with_root.items[1].role, "assistant"));
+    try std.testing.expect(std.mem.indexOf(u8, prompt_with_root.items[0].content, "Root question") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt_with_root.items[1].content, "Running summary so far") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt_with_root.items[2].content, "Material chunk 1/3") != null);
+    try std.testing.expect(std.mem.indexOf(u8, prompt_with_root.items[2].content, "Paris is the capital city") != null);
+}
+
+test "buildFinalPrompt works" {
+    const allocator = std.testing.allocator;
+    var final_prompt = try buildFinalPrompt(
+        "What is the capital of France?",
+        "The material states that Paris is the capital city of France.",
+        allocator,
+    );
+    defer final_prompt.deinit(allocator);
+    defer ReleaseMessageArray(final_prompt, allocator);
+
+    try std.testing.expectEqual(@as(usize, 3), final_prompt.items.len);
+    try std.testing.expect(std.mem.indexOf(u8, final_prompt.items[0].content, "Root question") != null);
+    try std.testing.expect(std.mem.eql(u8, final_prompt.items[1].role, "assistant"));
+    try std.testing.expect(std.mem.indexOf(u8, final_prompt.items[1].content, "Accumulated evidence summary") != null);
+    try std.testing.expect(std.mem.indexOf(u8, final_prompt.items[2].content, "Follow the format requested by the root question") != null);
+    try std.testing.expect(std.mem.indexOf(u8, final_prompt.items[2].content, "Do not wrap returned code in Markdown fences") != null);
 }
 
 /// Build the system prompt for RLM initialization
@@ -303,9 +209,9 @@ pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: Quer
     }
     defer allocator.free(context_lengths_str);
 
-    const tes: []u8 = try std.fmt.allocPrint(
+    const context_info: []u8 = try std.fmt.allocPrint(
         allocator,
-        "Your context is a {s} with {d} total characters, and is broken up into chunks of char lengths: {s}.",
+        "Your material is a {s} with {d} total characters, and is broken up into chunks of char lengths: {s}.",
         .{
             context_type,
             context_total_length,
@@ -321,7 +227,7 @@ pub fn buildSystemPrompt(custom_system_prompt: ?[]const u8, query_metadata: Quer
 
     var system_prompt: std.ArrayList(Message) = .empty;
     try system_prompt.append(allocator, Message{ .role = "system", .content = system_content });
-    try system_prompt.append(allocator, Message{ .role = "assistant", .content = tes });
+    try system_prompt.append(allocator, Message{ .role = "assistant", .content = context_info });
     return system_prompt;
 }
 
@@ -329,8 +235,8 @@ test "buildSystemPrompt works" {
     const allocator = std.testing.allocator;
     const query_metadata: QueryMetadata = .{
         .context_length = &[2]u32{ 10, 20 },
-        .context_total_length = 16,
-        .context_type = "str",
+        .context_total_length = 30,
+        .context_type = "chunked_str",
     };
     var system_prompt = try buildSystemPrompt(null, query_metadata, allocator);
     defer system_prompt.deinit(allocator);

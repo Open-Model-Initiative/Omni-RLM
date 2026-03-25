@@ -2,11 +2,11 @@
 
 # Omni-RLM
 
-### A High-Performance Recursive Language Model Framework
+### A High-Performance Long-Text Reasoning Framework
 
 [![Zig](https://img.shields.io/badge/Zig-0.15.2-orange.svg)](https://ziglang.org/)
 
-*Leverage the power of recursive reasoning in AI agents with type-safe, high-performance Zig*
+_Process ultra-long material with chunked reasoning and type-safe, high-performance Zig_
 
 中文文档: [README_CN.md](README_CN.md)
 
@@ -25,12 +25,12 @@
 
 ## 📖 Overview
 
-Omni-RLM is a **high-performance [recursive language model framework](https://github.com/alexzhang13/rlm)** that enables AI agents to perform complex reasoning tasks through controlled recursive LLM calls. Built with Zig's zero-cost abstractions and memory safety features, it provides a robust foundation for production-grade AI applications.
+Omni-RLM is a **high-performance long-text reasoning framework** for answering a root question against very large material. Built with Zig's zero-cost abstractions and memory safety features, it provides a robust foundation for production-grade AI applications that need chunked traversal, cumulative summarization, and final synthesis.
 
 ### Why Omni-RLM?
 
 - 🚀 **Blazing Fast**: Leveraging Zig's zero-cost abstractions and manual memory management for optimal performance
-- 🔄 **Recursive Reasoning**: Support for multi-depth language model calls with fine-grained control
+- 🔄 **Chunked Reasoning**: Traverse very long material incrementally with cumulative summaries
 - 📝 **Production-Ready Logging**: Comprehensive structured logging for debugging and analysis
 - 🔌 **Backend Agnostic**: Works with any OpenAI-compatible API (OpenAI, Qwen, Anthropic, etc.)
 - 🎯 **Type-Safe**: Compile-time guarantees prevent runtime errors
@@ -38,39 +38,39 @@ Omni-RLM is a **high-performance [recursive language model framework](https://gi
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| **Recursive Execution** | Execute language models with configurable recursion depth limits |
-| **Query Tracking** | Automatic tracking of context length, type, and metadata |
-| **Iteration Logging** | JSON-formatted logs for every iteration with full traceability |
-| **Backend Flexibility** | Easy integration with OpenAI, Qwen, or any compatible LLM-API spec |
-| **Memory Safety** | Built-in protection against memory leaks and undefined behavior |
-| **Custom Prompts** | Override system prompts for specialized agent behaviors |
+| Feature                  | Description                                                        |
+| ------------------------ | ------------------------------------------------------------------ |
+| **Long-Text Processing** | Traverse very large material with configurable chunk sizing        |
+| **Query Tracking**       | Automatic tracking of context length, type, and metadata           |
+| **Iteration Logging**    | JSON-formatted logs for every iteration with full traceability     |
+| **Backend Flexibility**  | Easy integration with OpenAI, Qwen, or any compatible LLM-API spec |
+| **Memory Safety**        | Built-in protection against memory leaks and undefined behavior    |
+| **Custom Prompts**       | Override system prompts for specialized agent behaviors            |
 
 ## Installation
 
 ### Prerequisites
 
 - [Zig](https://ziglang.org/download/) 0.15.2 or later
-- Python package `dill` for code execution in the 
+- Python runtime is not required for the current long-text processing flow
 
 ### Installation Steps
+
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/Open-Model-Initiative/Omni-RLM.git
 cd Omni-RLM
 ```
-2. Install Python dependencies:
-```bash
-pip install dill # Only needed if executing code in local environment
-``` 
 
-3. Copy the template and create your `.env` file:
+2. Copy the template and create your `.env` file:
+
 ```bash
 cp .env.example .env
 ```
 
-4. Fill your `.env` values:
+3. Fill your `.env` values:
+
 ```dotenv
 OMNIRLM_API_KEY=sk-your-api-key-here
 OMNIRLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
@@ -122,18 +122,16 @@ pub fn main() !void {
     try rlm.init();
     defer rlm.deinit();
 
-    // Make a completion request
-    const prompt = "Print me the first 100 powers of two, each on a newline.";
-    const p = try allocator.dupe(u8, prompt);
-    defer allocator.free(p);
-    
-    const result = try rlm.completion(p, null);
+    const root = "Summarize the material in 3 sentences.";
+    const material_path = "README.md";
+
+    const result = try rlm.completion(root, material_path);
     defer allocator.free(result.response);
-    
+
     std.debug.print("Response: {s}\n", .{result.response});
     std.debug.print("Execution Time: {d}ms\n", .{result.execution_time});
 }
-``` 
+```
 
 ## 💡 Usage Examples
 
@@ -149,7 +147,7 @@ export OPENAI_API_KEY="sk-..."
 zig build openclaw -- "Implement a Fibonacci CLI and test it"
 ```
 
-This gives you an agentic coding loop (plan → execute → reflect → final answer) while reusing Omni-RLM's recursion, logging, and environment tooling.
+This gives you a long-text analysis loop that incrementally reads material, maintains a running summary, and produces a final answer.
 
 ### Configuring Different Backends
 
@@ -169,6 +167,7 @@ var rlm: RLM = .{
     .allocator = allocator,
 };
 ```
+
 </details>
 
 <details>
@@ -186,6 +185,7 @@ var rlm: RLM = .{
     .allocator = allocator,
 };
 ```
+
 </details>
 
 <details>
@@ -203,30 +203,27 @@ var rlm: RLM = .{
     .allocator = allocator,
 };
 ```
+
 </details>
 
 ### Working with Logs
 
-The logger creates structured JSON logs that include:
+The logger creates structured JSONL logs that include metadata, per-chunk iterations, and the final completion result.
+
+The final answer returned by `rlm.completion(...)` is written as a `type: "completion"` entry at the end of the log file.
 
 ```json
 {
-  "prompt": [{"role":"Your prompt concat with system message"}...],
-  "response": "Model response",
-    "code_blocks": [
-        {
-            "code": "extracted code block if any",
-            "result": {
-                "stdout": "output from code execution",
-                "stderr": "error output if any",
-                "term": "exit status"
-            }
-        }
-    ],
-  "final_answer": "Extracted final answer if any",
-  "execution_time": 1234//milliseconds
+  "type": "completion",
+  "root_model": "qwen3.5-plus",
+  "prompt": "Based on this API reference, return a minimal directly executable Zig example showing how to call buildFinalPrompt.",
+  "response": "const std = @import(\"std\");\n...",
+  "execution_time": 14121,
+  "timestamp": "2026-03-25T16:14:36.147378"
 }
 ```
+
+If you want the final answer to be executable code, express that directly in the root question, for example `Return code only, no Markdown fences, no explanation.`
 
 ## 📁 Project Structure
 
@@ -240,15 +237,11 @@ Omni-RLM/
 │   │   ├── rlm_logger.zig    # Structured logging system
 │   │   ├── types.zig         # Type definitions and structs
 │   │   ├── prompt.zig        # Prompt construction utilities
-│   │   ├── parsing.zig       # Response parsing (code blocks)
 │   │   ├── Model_info.zig    # Model configuration and metadata
 │   │   └── environment/
 │   │       ├── type.zig      # EnvHandler and env types
-│   │       ├── local/        # Local Python environment
-│   │       │   └── local.zig # Local runner implementation
-│   │       └── daytona/      # Daytona environment
-│   │           └── daytona.zig       # Daytona runner
-│   │           └── daytona_script.py # Daytona helper script
+│   │       ├── local/        # Local material storage
+│   │       │   └── local.zig # Local chunk reader implementation
 │   └── example/
 │       ├── quickstart.zig    # Example usage (use for debug and testing)
 │       ├── run.zig           # Example runner
@@ -265,9 +258,8 @@ Omni-RLM/
 - **`src/omni-rlm.zig`**: Package interface and `config_env` export
 - **`src/core/rlm.zig`**: Main entry point with RLM struct and completion logic
 - **`src/core/rlm_logger.zig`**: Handles all logging operations with JSON output
-- **`src/core/types.zig`**: Shared type definitions (metadata, message, code blocks)
+- **`src/core/types.zig`**: Shared type definitions (metadata, message, iteration data)
 - **`src/core/prompt.zig`**: System prompt building from query metadata
-- **`src/core/parsing.zig`**: Utilities to extract structured data from responses
 - **`src/core/Model_info.zig`**: Model configurations and capabilities
 
 ## 🧪 Test

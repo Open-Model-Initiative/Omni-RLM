@@ -1,6 +1,7 @@
 const std = @import("std");
 const Metadata = @import("types.zig").RLMMetadata;
 const RLMIteration = @import("types.zig").RLMIteration;
+const RLMChatCompletion = @import("types.zig").RLMChatCompletion;
 
 /// Format a timestamp as ISO 8601 format with microseconds
 ///
@@ -231,6 +232,29 @@ pub const RLMLogger = struct {
         self.metadata_logged = true;
     }
 
+    /// Log the final completion result.
+    ///
+    /// Writes the final returned answer to the log file so the user can inspect
+    /// the exact completion that was surfaced by the API.
+    pub fn log_completion(self: *RLMLogger, completion: RLMChatCompletion, allocator: std.mem.Allocator) !void {
+        const data_string = try std.json.Stringify.valueAlloc(allocator, completion, .{});
+        defer allocator.free(data_string);
+
+        var entry: std.json.Parsed(std.json.Value) = try std.json.parseFromSlice(std.json.Value, allocator, data_string, .{});
+        defer entry.deinit();
+
+        const timestamp_str = try formatTimestampUtc(allocator, std.time.timestamp());
+        defer allocator.free(timestamp_str);
+
+        try entry.value.object.put("type", std.json.Value{ .string = "completion" });
+        try entry.value.object.put("timestamp", std.json.Value{ .string = timestamp_str });
+
+        const json_completion = std.json.fmt(entry.value, .{ .whitespace = .indent_4 });
+        const str = try std.fmt.allocPrint(allocator, "{f}", .{json_completion});
+        defer allocator.free(str);
+        try self.log(str);
+    }
+
     /// Write a line to the log file
     ///
     /// Internal method to append data to the log file.
@@ -269,7 +293,6 @@ test "RLMLogger initialization" {
 
 test "RLMLogger log_iteration" {
     const Message = @import("types.zig").Message;
-    const CodeBlock = @import("types.zig").CodeBlock;
     const allocator = std.testing.allocator;
     var logger = try RLMLogger.init("./logs", "Test rlmiteration", allocator);
     defer logger.deinit(allocator);
@@ -280,15 +303,10 @@ test "RLMLogger log_iteration" {
     var iteration_data: RLMIteration = .{
         .prompt = prompt,
         .response = "1+1=2",
-        .code_blocks = allocator.dupe(CodeBlock, &.{CodeBlock{
-            .code = "print(1+1)",
-            .result = .{
-                .stdout = "",
-                .stderr = "",
-                .term = .{ .Exited = 0 },
-            },
-        }}) catch unreachable,
-        .final_answer = "2",
+        .chunk_index = 0,
+        .total_chunks = 1,
+        .chunk_length = 12,
+        .running_summary = "The material states that 1+1=2.",
         .iteration_time = 10,
     };
     defer {
@@ -296,7 +314,6 @@ test "RLMLogger log_iteration" {
             allocator.free(msg.content);
         }
         iteration_data.prompt.deinit(allocator);
-        allocator.free(iteration_data.code_blocks);
     }
 
     try logger.log_iteration(iteration_data, allocator);
@@ -322,4 +339,19 @@ test "RLMLogger log_metadata" {
     };
 
     try logger.log_metadata(metadata, allocator);
+}
+
+test "RLMLogger log_completion" {
+    const allocator = std.testing.allocator;
+    var logger = try RLMLogger.init("./logs", "Test rlmcompletion", allocator);
+    defer logger.deinit(allocator);
+
+    const completion: RLMChatCompletion = .{
+        .root_model = "TestModel",
+        .prompt = "Return example code",
+        .response = "const x = 1;",
+        .execution_time = 25,
+    };
+
+    try logger.log_completion(completion, allocator);
 }

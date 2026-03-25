@@ -22,6 +22,7 @@ test "quickstart run" {
             .environment = "local",
             .environment_kwargs = "{}",
             .max_depth = 1,
+            .material_chunk_size = 128,
             .logger = logger,
             .allocator = allocator,
             .max_iterations = 5,
@@ -29,13 +30,14 @@ test "quickstart run" {
 
     try rlm.init();
     defer rlm.deinit();
-    const prompt = "Print me the first 100 powers of two, each on a newline.";
-    const p = try allocator.dupe(u8, prompt);
-    defer allocator.free(p);
-    std.debug.print("INPUT:{s}", .{prompt});
-    const result = try rlm.completion(p, null);
+    const root = "According to README.md, what are the three main characteristics of Omni-RLM?";
+    const material_path = "README.md";
+
+    std.debug.print("INPUT:{s}\n", .{root});
+    const result = try rlm.completion(root, material_path);
     defer allocator.free(result.response);
     std.debug.print("total time: {d}ms\n", .{result.execution_time});
+    std.debug.print("Answer:\n{s}\n", .{result.response});
 
     std.debug.print("\n*******RLM finished*******\n", .{});
 }
