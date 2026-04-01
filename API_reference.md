@@ -247,7 +247,23 @@ Returns the number of chunks for the stored material.
 
 ##### `read_chunk(self: *const EnvHandler, chunk_index: usize, chunk_size: usize, allocator: std.mem.Allocator) ![]u8`
 
-Reads a single chunk of material from the stored source text.
+Reads a single chunk of material from the stored source text. Uses smart boundary alignment (sentence-aware chunking).
+
+##### `read_chunk_with_overlap(self: *const EnvHandler, chunk_index: usize, chunk_size: usize, overlap_size: usize, allocator: std.mem.Allocator) ![]u8`
+
+Reads a chunk with overlap from the previous chunk for context preservation.
+
+**Parameters:**
+- `chunk_index`: Index of the chunk to read
+- `chunk_size`: Target size of the chunk
+- `overlap_size`: Number of bytes to include from the previous chunk
+- `allocator`: Memory allocator
+
+**Returns:** Combined content with overlap from previous chunk
+
+##### `set_overlap(self: *EnvHandler, overlap: usize) void`
+
+Sets the default overlap size for the environment.
 
 ##### `deinit(self: *EnvHandler, allocator: std.mem.Allocator) !void`
 
@@ -268,14 +284,47 @@ try env.deinit(allocator);
 
 #### Fields
 
-| Field     | Type          | Default | Description                                |
-| --------- | ------------- | ------- | ------------------------------------------ |
-| `context` | `?[]const u8` | `null`  | Source material stored for chunked reading |
+| Field           | Type          | Default | Description                                              |
+| --------------- | ------------- | ------- | -------------------------------------------------------- |
+| `context`       | `?[]const u8` | `null`  | Source material stored for chunked reading               |
+| `overlap_size`  | `usize`       | `100`   | Overlap size in bytes between consecutive chunks         |
+
+#### Smart Chunking Features
+
+**Sentence Boundary Alignment**
+
+The `LocalEnv` now supports intelligent chunking that automatically aligns chunk boundaries to sentence boundaries:
+
+- **Supported punctuation**: `.` `!` `?` (English) and `。` `！` `？` (Chinese)
+- **Behavior**: When a raw chunk boundary falls mid-sentence, the system searches forward (up to chunk size or 1000 bytes) for the next sentence boundary
+- **Fallback**: If no boundary is found ahead, searches backward within the same range
+- **Benefit**: Prevents cutting sentences in half, improving coherence of processed chunks
+
+**Overlap Support**
+
+Chunks can include overlap from the previous chunk to preserve context:
+
+- **Configuration**: Set `overlap_size` (default: 100 bytes)
+- **Method**: Use `read_chunk_with_overlap()` instead of `read_chunk()`
+- **Benefit**: Ensures context continuity across chunk boundaries, especially useful when a sentence spans across chunks
+
+#### Methods
+
+##### `setOverlap(self: *LocalEnv, overlap: usize) void`
+
+Sets the overlap size for context preservation between chunks.
+
+##### `read_chunk_with_overlap(self: *const LocalEnv, chunk_index: usize, chunk_size: usize, allocator: std.mem.Allocator) ![]u8`
+
+Reads a chunk including overlap content from the previous chunk.
+
+**Returns:** Combined content of `[overlap_from_previous] + [current_chunk]`
 
 #### Notes
 
 - The local environment stores the full material string in memory.
-- Chunks are read lazily via `read_chunk` during iteration.
+- Chunks are read lazily via `read_chunk` or `read_chunk_with_overlap` during iteration.
+- Smart boundary alignment is applied automatically to both regular and overlap-enabled chunk reading.
 
 ---
 
@@ -337,6 +386,7 @@ Sends a chat completion request to the configured API endpoint.
 | `max_depth`            | `u32`               | `1`        | Maximum allowed fallback depth              |
 | `max_iterations`       | `u32`               | `8`        | Maximum chunk iterations per completion     |
 | `material_chunk_size`  | `usize`             | `16384`    | Preferred size of each material chunk       |
+| `chunk_overlap`        | `usize`             | `0`        | Overlap bytes between chunks for context preservation |
 | `custom_system_prompt` | `?[]const u8`       | `null`     | Override default system prompt              |
 | `other_backends`       | `?[]const u8`       | `null`     | Fallback backend services                   |
 | `other_backend_kwargs` | `?[]const u8`       | `null`     | Config for fallback backends                |
@@ -368,7 +418,10 @@ Generates a final answer by loading material from a file path and traversing it 
 
 - Builds the system prompt using `QueryMetadata` and `buildSystemPrompt`.
 - Reads the material from `material_path` inside the RLM execution flow.
-- Splits material into chunks and iteratively updates a running summary.
+- Splits material into chunks using **smart boundary alignment** (sentence-aware chunking).
+- **Smart Chunking**: Automatically aligns chunk boundaries to sentence boundaries (supports English `. ! ?` and Chinese `。！？` punctuation).
+- **Overlap Support**: When `chunk_overlap > 0`, each chunk (except the first) includes `chunk_overlap` bytes from the previous chunk for context preservation.
+- Iteratively updates a running summary across all chunks.
 - Iterative calls use streaming mode (`stream = true`) and disable thinking output (`enable_thinking = false`).
 - Produces the final answer from the accumulated running summary.
 - If `max_depth` is exceeded, falls back to a single direct call over the full material.

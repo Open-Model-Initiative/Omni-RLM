@@ -146,8 +146,12 @@ The `config_env.zig` module supports:
    - API key stripping for security
 
 3. **EnvHandler** (`src/core/environment/type.zig`): Material access wrapper
-   - Supports `local` material storage
+   - Supports `local` material storage with **smart chunking**
    - Unified interface via chunk-read methods
+   - **Smart chunking features**:
+     - Sentence boundary alignment (supports English and Chinese punctuation)
+     - Overlap support for context preservation between chunks
+     - Configurable overlap size via `chunk_overlap` field in RLM
 
 4. **Message** (`src/core/types.zig`): OpenAI-compatible message format
    - Fields: `role` ("system" | "user" | "assistant"), `content`

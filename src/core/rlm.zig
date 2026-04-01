@@ -21,6 +21,9 @@ pub const RLM = struct {
     max_depth: u32 = 1,
     max_iterations: u32 = 8,
     material_chunk_size: usize = 16 * 1024,
+    /// Overlap size in bytes between consecutive chunks for context preservation.
+    /// Default is 0 (no overlap). Typical values: 100-500 bytes.
+    chunk_overlap: usize = 0,
     custom_system_prompt: ?[]const u8 = null,
     other_backends: ?[]const u8 = null,
     other_backend_kwargs: ?[]const u8 = null,
@@ -172,8 +175,17 @@ pub const RLM = struct {
         var running_summary = try allocator.dupe(u8, "No evidence processed yet.");
         defer allocator.free(running_summary);
 
+        // Set overlap size on environment if enabled
+        if (self.chunk_overlap > 0) {
+            env.set_overlap(self.chunk_overlap);
+        }
+
         for (0..total_chunks) |chunk_index| {
-            const chunk = try env.read_chunk(chunk_index, chunk_size, allocator);
+            // Use overlap-aware chunk reading if overlap is enabled
+            const chunk = if (self.chunk_overlap > 0)
+                try env.read_chunk_with_overlap(chunk_index, chunk_size, self.chunk_overlap, allocator)
+            else
+                try env.read_chunk(chunk_index, chunk_size, allocator);
             defer allocator.free(chunk);
 
             var user_prompt = try PROMPT.buildUserPrompt(.{
@@ -192,6 +204,9 @@ pub const RLM = struct {
             try current_prompt.appendSlice(allocator, user_prompt.items);
 
             std.debug.print("\n========== CHUNK {d}/{d} ==========\n", .{ chunk_index + 1, total_chunks });
+            if (self.chunk_overlap > 0) {
+                std.debug.print("[Overlap: {d} bytes]\n", .{self.chunk_overlap});
+            }
 
             const iteration = try self.completion_turn(
                 current_prompt,

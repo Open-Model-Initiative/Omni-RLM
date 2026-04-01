@@ -31,6 +31,7 @@ Omni-RLM is a **high-performance long-text reasoning framework** for answering a
 
 - 🚀 **Blazing Fast**: Leveraging Zig's zero-cost abstractions and manual memory management for optimal performance
 - 🔄 **Chunked Reasoning**: Traverse very long material incrementally with cumulative summaries
+- 🧠 **Smart Chunking**: Automatic sentence boundary alignment preserves context and improves coherence
 - 📝 **Production-Ready Logging**: Comprehensive structured logging for debugging and analysis
 - 🔌 **Backend Agnostic**: Works with any OpenAI-compatible API (OpenAI, Qwen, Anthropic, etc.)
 - 🎯 **Type-Safe**: Compile-time guarantees prevent runtime errors
@@ -41,6 +42,8 @@ Omni-RLM is a **high-performance long-text reasoning framework** for answering a
 | Feature                  | Description                                                        |
 | ------------------------ | ------------------------------------------------------------------ |
 | **Long-Text Processing** | Traverse very large material with configurable chunk sizing        |
+| **Smart Chunking**       | Automatic sentence boundary alignment (English + Chinese)          |
+| **Context Overlap**      | Preserve context between chunks with configurable overlap          |
 | **Query Tracking**       | Automatic tracking of context length, type, and metadata           |
 | **Iteration Logging**    | JSON-formatted logs for every iteration with full traceability     |
 | **Backend Flexibility**  | Easy integration with OpenAI, Qwen, or any compatible LLM-API spec |
@@ -206,6 +209,25 @@ var rlm: RLM = .{
 
 </details>
 
+### Smart Chunking with Sentence Boundaries
+
+Omni-RLM now supports intelligent chunking that automatically aligns chunk boundaries to sentence boundaries, supporting both English (`. ! ?`) and Chinese (`。！？`) punctuation.
+
+```zig
+var rlm: RLM = .{
+    .backend = "openai",
+    .backend_kwargs = backend_cfg,
+    .material_chunk_size = 8 * 1024,  // 8KB base chunk size
+    .chunk_overlap = 500,             // 500 bytes overlap for context
+    .allocator = allocator,
+};
+```
+
+**Benefits:**
+- **Sentence-aware**: Chunks end at sentence boundaries instead of cutting mid-sentence
+- **Context preservation**: Overlap between chunks ensures continuity
+- **Better quality**: More coherent running summaries when processing long documents
+
 ### Working with Logs
 
 The logger creates structured JSONL logs that include metadata, per-chunk iterations, and the final completion result.
@@ -241,7 +263,7 @@ Omni-RLM/
 │   │   └── environment/
 │   │       ├── type.zig      # EnvHandler and env types
 │   │       ├── local/        # Local material storage
-│   │       │   └── local.zig # Local chunk reader implementation
+│   │       │   └── local.zig # Local chunk reader with smart boundary alignment
 │   └── example/
 │       ├── quickstart.zig    # Example usage (use for debug and testing)
 │       ├── run.zig           # Example runner
