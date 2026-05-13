@@ -21,9 +21,15 @@ pub const ModelHandler = struct {
     ///
     /// - `stream`: Enables SSE stream parsing (`data: ...` lines).
     /// - `enable_thinking`: Prints `reasoning_content` when backend provides it.
+    /// - `ca_bundle`: Optional pre-loaded CA certificate bundle. When non-null the
+    ///   bundle is injected into the HTTP client directly, bypassing the lazy
+    ///   per-client system-certificate scan. This is required for worker threads
+    ///   on macOS because the Security-framework APIs used during that scan must
+    ///   be called from the main thread.
     pub const RequestConfig = struct {
         stream: bool = false,
         enable_thinking: bool = false,
+        ca_bundle: ?*const std.crypto.Certificate.Bundle = null,
     };
 
     const StreamState = struct {
@@ -250,7 +256,22 @@ pub const ModelHandler = struct {
         const endpoint = try std.Uri.parse(endpoint_url);
 
         var client: Client = .{ .allocator = allocator };
-        defer client.deinit();
+        if (config.ca_bundle) |bundle| {
+            // Use the caller-supplied pre-loaded bundle.  Shallow-copying is
+            // safe here because the bundle is read-only after rescan().
+            // We disable next_https_rescan_certs so the client never tries to
+            // call rescan() itself (which would be unsafe from a worker thread
+            // on macOS).
+            client.ca_bundle = bundle.*;
+            client.next_https_rescan_certs = false;
+        }
+        defer {
+            if (config.ca_bundle != null) {
+                // Prevent client.deinit() from freeing the caller's shared bundle.
+                client.ca_bundle = .{};
+            }
+            client.deinit();
+        }
 
         const headers: Request.Headers = .{
             .accept_encoding = .{ .override = "identity" },

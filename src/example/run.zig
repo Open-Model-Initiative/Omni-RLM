@@ -18,11 +18,11 @@ pub fn main() !void {
     defer backend_cfg.deinit(allocator);
 
     std.debug.print(
-        \\n******* RLM Smart Chunking Demo *******\n
-        \\nThis demo shows:\n
-        \\  1. Sentence boundary alignment (chunks end at . ! ? 。！？)\n
-        \\  2. Context overlap between chunks (configurable)\n
-        \\n***************************************\n
+        \\******* RLM Smart Chunking Demo *******
+        \\This demo shows:
+        \\  1. Sentence boundary alignment (chunks end at . ! ? 。！？)
+        \\  2. Context overlap between chunks (configurable)
+        \\***************************************
     , .{});
 
     const logger = try RLMLogger.init("./logs", "run", allocator);
@@ -41,6 +41,7 @@ pub fn main() !void {
         .logger = logger,
         .allocator = allocator,
         .max_iterations = 5,
+        .parallel = true, // Enable parallel processing of chunks
     };
 
     try rlm.init();
